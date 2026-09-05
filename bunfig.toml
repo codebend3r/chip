@@ -1,0 +1,4 @@
+[install]
+# Every dependency in package.json is pinned to an exact version.
+# `bun add` writes `1.2.3`, never `^1.2.3`.
+exact = true

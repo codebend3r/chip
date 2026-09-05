@@ -27,6 +27,7 @@ When the user does ask for a commit, follow `.claude/skills/commit-format/SKILL.
 | --------------- | ----------------------------------------- |
 | Runtime         | Node 24 (`.node-version`, `engines.node`) |
 | Package manager | bun (`bun.lock`) — never `npm install`    |
+| Versions        | exact — no `^`, no `~`, no ranges         |
 | Lint            | `oxlint` (`.oxlintrc.json`)               |
 | Format          | `oxfmt` (`.oxfmtrc.json`), 120 columns    |
 | Language        | TypeScript, strict, `react-jsx` runtime   |
@@ -40,6 +41,10 @@ bun run fix-lint   # oxlint --fix && oxfmt
 ```
 
 There is no test suite. `bun run lint && bun run build` is the full check.
+
+Every entry in `dependencies` and `devDependencies` is an exact version. `bunfig.toml`
+sets `install.exact`, so `bun add` writes `1.2.3` and never `^1.2.3` — do not widen a
+pin back into a range, and do not hand-edit one in.
 
 ## Layout
 
