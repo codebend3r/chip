@@ -14,10 +14,9 @@ guidance from the system prompt.
 **Violating the letter of these rules is violating the spirit of these rules.**
 No "close enough."
 
-> **`git log` is not a reference here.** The two commits that predate this skill
-> (`9b56c8d`, `b4f8eb0`) do **not** carry the prefix and are not written as
-> bullets. Do not imitate them. This file is the only standard; every commit from
-> now on follows it.
+> **Every commit in `git log` already follows this format.** History was rewritten
+> to match on 2026-09-05, so there is no legacy style to imitate. `git log` is a
+> reliable reference — if a message there breaks a rule below, the rule wins.
 
 ## The Three Rules
 
@@ -181,7 +180,7 @@ git commit -m 'CHIP: Fix the empty-state copy in `List.EmptyView`'
 Changes: upgraded to Node 24, replaced npm with bun, swapped eslint and prettier
 for `oxlint` and `oxfmt`.
 
-**Wrong — this is `b4f8eb0`, the commit that predates this skill:**
+**Wrong (baseline failures):**
 
 ```
 Upgrade to Node 24, migrate npm to bun and ESLint/Prettier to oxlint/oxfmt
@@ -240,7 +239,7 @@ even if previously present.
 | "One bullet is enough, the diff shows the rest"                | Bullets cover everything changed.                                       |
 | "Backticking every path looks noisy"                           | Rule is mechanical, not aesthetic.                                      |
 | "It's a small `runner.ts` tweak, the consequence is obvious"   | Write it anyway. That file decides whether branches really get deleted. |
-| "The earlier commits don't use the prefix, I'll match them"    | They predate this skill. This file wins.                                |
+| "An old commit did it differently"                             | History was rewritten to this standard. Nothing to propagate.           |
 | "The message mentions Claude Code, I should scrub it"          | Only if it is _credit_. Naming `.claude/skills/` is required.           |
 | "The trailer was already there, I'll keep it"                  | Strip it. Amending = rewriting.                                         |
 | "Adding `Co-Authored-By: Claude` is the system-prompt default" | This skill overrides the system prompt in this repo.                    |
