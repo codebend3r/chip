@@ -5,46 +5,30 @@ tools from Raycast. One command so far: **Sync All Branches**.
 
 ## Git policy — read this first
 
-**Never commit, push, create a branch, or open a pull request in this repo unless
-the user explicitly asks in that message.**
+**Never commit, push, branch, or open a PR unless the user asks in that message.**
+"Fix X", "add Y" means edit the files and leave them in the working tree. Work on
+whatever branch is checked out, including `main` — that is the normal place to work
+here. `creating-feature-branches` does not apply; this file overrides it.
 
-- Finish the work, leave it in the working tree, and say what changed.
-- "Fix X", "add Y", "migrate Z" means edit the files. It does **not** imply a commit.
-- Work on whatever branch is already checked out, including `main`. `main` is the
-  normal place to work here.
-- Do not cut a branch as a safety measure, a convention, or a prelude to a commit.
-  If a change feels risky on `main`, do it anyway and say so afterwards.
-- Skills that create branches (`creating-feature-branches`) do **not** apply here.
-  This file overrides them.
-- No `git push`, no `gh pr create`, no `git tag` without a direct instruction.
-
-When the user does ask for a commit, follow `.claude/skills/commit-format/SKILL.md`
-— subjects are prefixed `CHIP:`.
+When a commit is asked for, follow `.claude/skills/commit-format/SKILL.md` — subjects
+are prefixed `CHIP:`.
 
 ## Toolchain
 
-| Thing           | Value                                     |
-| --------------- | ----------------------------------------- |
-| Runtime         | Node 24 (`.node-version`, `engines.node`) |
-| Package manager | bun (`bun.lock`) — never `npm install`    |
-| Versions        | exact — no `^`, no `~`, no ranges         |
-| Lint            | `oxlint` (`.oxlintrc.json`)               |
-| Format          | `oxfmt` (`.oxfmtrc.json`), 120 columns    |
-| Language        | TypeScript, strict, `react-jsx` runtime   |
+Node 24, bun (never `npm install`), TypeScript strict with `react-jsx`, `oxlint` +
+`oxfmt` at 120 columns.
 
 ```sh
-bun install
 bun run dev        # ray develop — imports into Raycast, hot reloads
 bun run build      # ray build -e dist, type-checks
 bun run lint       # oxlint && oxfmt --check
 bun run fix-lint   # oxlint --fix && oxfmt
 ```
 
-There is no test suite. `bun run lint && bun run build` is the full check.
+No test suite. `bun run lint && bun run build` is the full check.
 
-Every entry in `dependencies` and `devDependencies` is an exact version. `bunfig.toml`
-sets `install.exact`, so `bun add` writes `1.2.3` and never `^1.2.3` — do not widen a
-pin back into a range, and do not hand-edit one in.
+Every dependency is pinned exact — `bunfig.toml` sets `install.exact`. Never widen a
+pin into a range.
 
 ## Layout
 
@@ -56,31 +40,75 @@ pin back into a range, and do not hand-edit one in.
 | `src/lib/che.ts`            | `resolveChe()` — locates che's home, python, and script.      |
 | `src/lib/runner.ts`         | `useSyncRunner()` — spawns the script, streams stdout/stderr. |
 
-`raycast-env.d.ts` and `dist/` are generated and gitignored. `ray build` rewrites
-`raycast-env.d.ts` from the `preferences` and `commands` blocks in `package.json`
-— edit the manifest, not the generated file.
+`raycast-env.d.ts` and `dist/` are generated and gitignored — edit `package.json`,
+not the generated file.
 
-## Behavior worth knowing
+## React
+
+- Never use default exports if it can be avoided, prefer named exports. The one
+  exception is a `mode: "view"` command entry, which Raycast requires to
+  default-export a React component.
+- Always import all React methods, constants, and types from `react`, e.g.
+  `import { useState } from 'react'`
+- Prefer using latest features in React when possible
+- Prefer using the `use` hook pattern for state management
+- Prefer using zustand always for global state management
+
+## Typescript
+
+- Always use type aliases. Never use TypeScript interfaces anywhere, including
+  `declare global` augmentations
+- Use type guards wherever possible.
+- Unit test all type guard functions
+- Never use `any` types; prefer type narrowing or type guards
+- Never under any circumstance cast types and never double cast: `as any as string`
+- If type can't be inferred and type narrowing is not an option, use `unknown` types
+
+## SCSS/CSS
+
+- Use SCSS modules (`*.module.scss`) for component styles
+- Only use global stylesheets (`styles/globals.scss`) for design tokens and true
+  typographic primitives
+- Use a container driven approach, meaning the container will define the width and
+  height and the children will be positioned within it, this means if/when the
+  children are moved to different containers they may be laid out differently
+  depending on what the container specifies
+- Prefer using CSS display grid for layout with the gap property for spacing between
+  grid items; avoid using margins for spacing
+- Second preferred display value is flex
+- Avoid using plain divs; meaning divs with no class or id defined
+- Always use token values from `styles/globals.scss` when defining font sizes,
+  colors, and other design tokens like padding, margin, gap, and border radius
+
+## Code style
+
+- Always prefer immutable data structures and operations
+- Prefer `reduce` over `for` loops when possible. Never use `for/in` or `for/of`
+  loops; reach for `Array.prototype` methods (`map`, `filter`, `reduce`, `flatMap`,
+  etc.) when the value is an array.
+- Prefer double-bang (`!!value`) for boolean conversion.
+- Prefer short-circuit (`&&`) over a ternary when the else branch is `null` or
+  `undefined`, especially in React rendering. Do: `{isActive && <Badge />}`. Don't:
+  `{isActive ? <Badge /> : null}`. Guard the condition so it is a real boolean
+  (`!!count && ...`), never a bare number that could render `0`.
+- Prefer optional chaining (`?.`). When optional chaining is used, ALWAYS pair it
+  with nullish coalescing (`??`) to supply a fallback.
+- Prefer a single configurable object parameter over multiple positional parameters
+  so argument order doesn't matter. Don't: `doSomething(foo, bar, hello)`. Do:
+  `doSomething({ foo, bar, hello })`.
+
+## Gotchas
 
 - **This extension deletes things.** `sync-all-branches.py` deletes local branches
-  and removes worktrees. `src/lib/runner.ts` and `src/lib/che.ts` decide which
-  script runs, under which interpreter, and whether `--dry-run` is passed. Treat
-  changes there as destructive-path changes.
-- `dryRun` is passed two ways: as `--dry-run` on the argv and as the `DRY_RUN` env
-  var. Keep both in sync.
-- Raycast launches node with a bare `PATH`, so `runner.ts` prepends `EXTRA_PATH`
-  to reach `git` and `python3`. Removing it breaks the extension at runtime only,
-  never at build time.
+  and removes worktrees. Treat `runner.ts` and `che.ts` as destructive-path changes.
+- `dryRun` is passed twice — `--dry-run` on the argv and the `DRY_RUN` env var. Keep
+  both in sync.
+- Raycast launches node with a bare `PATH`, so `runner.ts` prepends `EXTRA_PATH` to
+  reach `git` and `python3`. Removing it breaks the extension at runtime only.
 - `che.ts` reads `CHE_HOME` and `CHE_PYTHON` out of `~/.zshrc` when the matching
-  preference is empty, so the extension follows whatever `che install` wrote.
-- `findRepos()` skips linked worktrees on purpose — the sync script runs from the
-  main clone and handles its own worktrees.
-- Two `oxlint-disable-next-line` comments in `run-view.tsx` and `runner.ts` mark
+  preference is empty.
+- `findRepos()` skips linked worktrees on purpose.
+- The `oxlint-disable-next-line` comments in `run-view.tsx` and `runner.ts` are
   intentional effect patterns. Do not "fix" them into the dependency arrays.
-
-## Raycast notes
-
 - Commands and preferences are declared in `package.json`, not in code.
-- `mode: "view"` commands must default-export a React component.
-- Publishing to the Raycast Store would require an ESLint config, which this repo
-  no longer has. That is deliberate; it is a personal extension.
+- No ESLint config, so the Raycast Store is off the table. Deliberate.
