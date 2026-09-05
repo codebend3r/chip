@@ -3,10 +3,10 @@ import { useEffect } from "react";
 import { Repo } from "./lib/repos";
 import { RunState, useSyncRunner } from "./lib/runner";
 
-interface RunViewProps {
+type RunViewProps = {
   repo: Repo;
   dryRun: boolean;
-}
+};
 
 function statusLabel(state: RunState): { text: string; icon: Icon; color: Color } {
   switch (state.status) {
@@ -29,6 +29,7 @@ export function RunView({ repo, dryRun }: RunViewProps) {
   const running = state.status === "running";
   const status = statusLabel(state);
   const mode = dryRun ? "Dry run" : "Live";
+  const durationText = duration(state);
 
   useEffect(() => {
     if (state.status === "succeeded") {
@@ -68,7 +69,7 @@ export function RunView({ repo, dryRun }: RunViewProps) {
             <Detail.Metadata.TagList.Item text={status.text} icon={status.icon} color={status.color} />
           </Detail.Metadata.TagList>
           {state.exitCode !== null && <Detail.Metadata.Label title="Exit Code" text={String(state.exitCode)} />}
-          {duration(state) && <Detail.Metadata.Label title="Duration" text={duration(state)} />}
+          {!!durationText && <Detail.Metadata.Label title="Duration" text={durationText} />}
         </Detail.Metadata>
       }
       actions={

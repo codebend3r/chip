@@ -5,19 +5,19 @@ import { resolveChe } from "./che";
 
 export type RunStatus = "running" | "succeeded" | "failed";
 
-export interface RunState {
+export type RunState = {
   status: RunStatus;
   output: string;
   exitCode: number | null;
   startedAt: number;
   finishedAt: number | null;
   error?: string;
-}
+};
 
-export interface RunOptions {
+export type RunOptions = {
   cwd: string;
   dryRun: boolean;
-}
+};
 
 /** Raycast launches node with a bare PATH; git and python live here on macOS. */
 const EXTRA_PATH = [

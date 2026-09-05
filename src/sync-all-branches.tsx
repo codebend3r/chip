@@ -7,7 +7,7 @@ import { RunView } from "./run-view";
 export default function Command() {
   const prefs = getPreferenceValues<Preferences.SyncAllBranches>();
   const root = prefs.reposRoot?.trim() ? expandHome(prefs.reposRoot.trim()) : defaultReposRoot();
-  const repos = useMemo(() => findRepos(root), [root]);
+  const repos = useMemo(() => findRepos({ root }), [root]);
 
   return (
     <List navigationTitle="Sync All Branches" searchBarPlaceholder="Pick a repo to sync">

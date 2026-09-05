@@ -3,14 +3,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { getPreferenceValues } from "@raycast/api";
 
-export interface CheConfig {
+export type CheConfig = {
   /** Root of the che checkout (what the shell calls CHE_HOME). */
   home: string;
   /** Python interpreter that runs the che scripts (CHE_PYTHON). */
   python: string;
   /** Absolute path to bin/git/sync-all-branches.py. */
   script: string;
-}
+};
 
 const RC_FILE = join(homedir(), ".zshrc");
 const FALLBACK_HOME = join(homedir(), "Developer", "git", "che");

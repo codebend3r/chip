@@ -2,14 +2,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 
-export interface Repo {
+export type Repo = {
   name: string;
   path: string;
   /** Path relative to the scanned root, for nested repos. */
   relativePath: string;
   /** Checked-out branch, or a short sha when detached. */
   branch: string | undefined;
-}
+};
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "target", "vendor"]);
 
@@ -38,32 +38,34 @@ function currentBranch(dir: string): string | undefined {
   }
 }
 
+type FindReposOptions = {
+  root: string;
+  depth?: number;
+};
+
 /**
  * Find main clones under `root`, up to `depth` levels down. Linked worktrees
  * are skipped: sync-all-branches runs from the main clone and handles them.
  */
-export function findRepos(root: string, depth = 2): Repo[] {
-  const found: Repo[] = [];
-
-  const walk = (dir: string, level: number) => {
+export function findRepos({ root, depth = 2 }: FindReposOptions): Repo[] {
+  const walk = (dir: string, level: number): Repo[] => {
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {
-      return;
+      return [];
     }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) continue;
-      const full = join(dir, entry.name);
-      const kind = gitKind(full);
-      if (kind === "repo") {
-        found.push({ name: entry.name, path: full, relativePath: relative(root, full), branch: currentBranch(full) });
-      } else if (kind === "none" && level < depth) {
-        walk(full, level + 1);
-      }
-    }
+    return entries
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !SKIP_DIRS.has(entry.name))
+      .flatMap((entry): Repo[] => {
+        const full = join(dir, entry.name);
+        const kind = gitKind(full);
+        if (kind === "repo") {
+          return [{ name: entry.name, path: full, relativePath: relative(root, full), branch: currentBranch(full) }];
+        }
+        return kind === "none" && level < depth ? walk(full, level + 1) : [];
+      });
   };
 
-  walk(root, 1);
-  return found.sort((a, b) => a.name.localeCompare(b.name));
+  return walk(root, 1).sort((a, b) => a.name.localeCompare(b.name));
 }
