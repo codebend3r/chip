@@ -80,6 +80,7 @@ export function useSyncRunner({ cwd, dryRun }: RunOptions) {
   }, [cwd, dryRun]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- run() resets state before spawning the child process
     run();
     return () => {
       child.current?.kill();

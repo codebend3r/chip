@@ -40,6 +40,7 @@ export function RunView({ repo, dryRun }: RunViewProps) {
         message: state.error ?? (state.exitCode !== null ? `exit code ${state.exitCode}` : undefined),
       });
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- fire once per status change, not when error/exitCode fill in
   }, [state.status]);
 
   const body = state.output || (running ? "Starting sync-all-branches..." : "(no output)");
