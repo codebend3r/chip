@@ -1,0 +1,69 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "chip",
+  "title": "Chip",
+  "description": "Run che tools from Raycast. Starts with sync-all-branches.",
+  "icon": "icon.png",
+  "author": "cj_rivas",
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Developer Tools"
+  ],
+  "commands": [
+    {
+      "name": "sync-all-branches",
+      "title": "Sync All Branches",
+      "subtitle": "Chip",
+      "description": "Pick a repo and run sync-all-branches in it: push worktrees, collapse the pushed ones, then tidy branches.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "reposRoot",
+      "title": "Repos Root",
+      "description": "Folder scanned (two levels deep) for git repos. Defaults to ~/Developer/git.",
+      "type": "directory",
+      "required": false
+    },
+    {
+      "name": "cheHome",
+      "title": "che Home",
+      "description": "Path to the che checkout. Defaults to CHE_HOME from the che install block in ~/.zshrc.",
+      "type": "directory",
+      "required": false
+    },
+    {
+      "name": "chePython",
+      "title": "Python Interpreter",
+      "description": "Python 3.12+ used to run che scripts. Defaults to CHE_PYTHON from ~/.zshrc.",
+      "type": "file",
+      "required": false
+    }
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@raycast/api": "^2.2.0",
+    "@raycast/utils": "^2.3.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^10.10.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build -e dist",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
