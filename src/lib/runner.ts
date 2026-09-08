@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from "node:child_process";
-import { join } from "node:path";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveChe } from "./che";
+import { CheCommand } from "./commands";
 
 export type RunStatus = "running" | "succeeded" | "failed";
 
@@ -15,11 +15,12 @@ export type RunState = {
 };
 
 export type RunOptions = {
+  command: CheCommand;
   cwd: string;
   dryRun: boolean;
 };
 
-/** Raycast launches node with a bare PATH; git and python live here on macOS. */
+/** Raycast launches node with a bare PATH; git, gh, and python live here on macOS. */
 const EXTRA_PATH = [
   "/opt/homebrew/bin",
   "/opt/homebrew/sbin",
@@ -35,10 +36,10 @@ function freshState(): RunState {
 }
 
 /**
- * Runs che's sync-all-branches.py in `cwd`, streaming stdout and stderr into
- * state as they arrive. Starts on mount and whenever cwd or dryRun change.
+ * Runs a che script in `cwd`, streaming stdout and stderr into state as they
+ * arrive. Starts on mount and whenever command, cwd, or dryRun change.
  */
-export function useSyncRunner({ cwd, dryRun }: RunOptions) {
+export function useCheRunner({ command, cwd, dryRun }: RunOptions) {
   const [state, setState] = useState<RunState>(freshState);
   const child = useRef<ChildProcess | null>(null);
 
@@ -46,14 +47,11 @@ export function useSyncRunner({ cwd, dryRun }: RunOptions) {
     child.current?.kill();
     setState(freshState());
 
-    const che = resolveChe();
-    const args = [che.script, ...(dryRun ? ["--dry-run"] : [])];
+    const che = resolveChe({ script: command.script });
+    const args = [che.script, ...command.args, ...(dryRun ? ["--dry-run"] : [])];
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: [...EXTRA_PATH, process.env.PATH ?? ""].filter(Boolean).join(":"),
-      CHE_HOME: che.home,
-      CHE_BIN: join(che.home, "bin"),
-      CHE_PYTHON: che.python,
       DRY_RUN: dryRun ? "true" : "false",
       NO_COLOR: "1",
       PYTHONUNBUFFERED: "1",
@@ -77,7 +75,7 @@ export function useSyncRunner({ cwd, dryRun }: RunOptions) {
         finishedAt: s.finishedAt ?? Date.now(),
       })),
     );
-  }, [cwd, dryRun]);
+  }, [command, cwd, dryRun]);
 
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- run() resets state before spawning the child process

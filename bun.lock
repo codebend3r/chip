@@ -5,6 +5,7 @@
     "": {
       "name": "chip",
       "dependencies": {
+        "@codebend3r/che": "1.1.0",
         "@raycast/api": "2.2.0",
         "@raycast/utils": "2.3.1",
       },
@@ -18,6 +19,8 @@
     },
   },
   "packages": {
+    "@codebend3r/che": ["@codebend3r/che@1.1.0", "", { "bin": { "che": "bin/che.py" } }, "sha512-lgcPzK05UezbgvLzWgn3Yg8M47MIRzFNMWPS5gREXqvTyiTtH0glT2wyxqRthEWFEJ/EwLIod8T6qWCLgO1FAg=="],
+
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ=="],
 
     "@esbuild/android-arm": ["@esbuild/android-arm@0.28.2", "", { "os": "android", "cpu": "arm" }, "sha512-kXXoiPVVGQcnIYGOeaovwOURpniDBpSq4A03qkQ+BMQqtGG6HYap3xne9C1O1yo4TR3qxlCX5IqqmX6fFo2Lqg=="],

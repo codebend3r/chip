@@ -1,10 +1,14 @@
+import { homedir } from "node:os";
 import { Action, ActionPanel, Color, Detail, Icon, Toast, showToast } from "@raycast/api";
 import { useEffect } from "react";
+import { CheCommand } from "./lib/commands";
 import { Repo } from "./lib/repos";
-import { RunState, useSyncRunner } from "./lib/runner";
+import { RunState, useCheRunner } from "./lib/runner";
 
 type RunViewProps = {
-  repo: Repo;
+  command: CheCommand;
+  /** Absent for global commands, which run from the home directory. */
+  repo?: Repo;
   dryRun: boolean;
 };
 
@@ -24,47 +28,44 @@ function duration(state: RunState): string | undefined {
   return `${((state.finishedAt - state.startedAt) / 1000).toFixed(1)}s`;
 }
 
-export function RunView({ repo, dryRun }: RunViewProps) {
-  const { state, rerun } = useSyncRunner({ cwd: repo.path, dryRun });
+export function RunView({ command, repo, dryRun }: RunViewProps) {
+  const cwd = repo?.path ?? homedir();
+  const { state, rerun } = useCheRunner({ command, cwd, dryRun });
   const running = state.status === "running";
   const status = statusLabel(state);
   const mode = dryRun ? "Dry run" : "Live";
+  const label = repo ? `${command.title}: ${repo.name}` : command.title;
   const durationText = duration(state);
 
   useEffect(() => {
     if (state.status === "succeeded") {
-      showToast({ style: Toast.Style.Success, title: `${repo.name} synced`, message: mode });
+      showToast({ style: Toast.Style.Success, title: `${label} finished`, message: command.dryRun ? mode : undefined });
     } else if (state.status === "failed") {
       showToast({
         style: Toast.Style.Failure,
-        title: `${repo.name} sync failed`,
+        title: `${label} failed`,
         message: state.error ?? (state.exitCode !== null ? `exit code ${state.exitCode}` : undefined),
       });
     }
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- fire once per status change, not when error/exitCode fill in
   }, [state.status]);
 
-  const body = state.output || (running ? "Starting sync-all-branches..." : "(no output)");
-  const markdown = [
-    `# ${dryRun ? "Preview" : "Sync"}: ${repo.name}`,
-    "",
-    "```",
-    body,
-    "```",
-    state.error ? `\n> ${state.error}` : "",
-  ].join("\n");
+  const body = state.output || (running ? `Starting ${command.name}...` : "(no output)");
+  const markdown = [`# ${label}`, "", "```", body, "```", state.error ? `\n> ${state.error}` : ""].join("\n");
 
   return (
     <Detail
       isLoading={running}
-      navigationTitle={`${repo.name}${dryRun ? " (dry run)" : ""}`}
+      navigationTitle={`${label}${dryRun ? " (dry run)" : ""}`}
       markdown={markdown}
       metadata={
         <Detail.Metadata>
-          <Detail.Metadata.Label title="Repo" text={repo.path} />
-          <Detail.Metadata.TagList title="Mode">
-            <Detail.Metadata.TagList.Item text={mode} color={dryRun ? Color.Yellow : Color.Green} />
-          </Detail.Metadata.TagList>
+          {!!repo && <Detail.Metadata.Label title="Repo" text={repo.path} />}
+          {command.dryRun && (
+            <Detail.Metadata.TagList title="Mode">
+              <Detail.Metadata.TagList.Item text={mode} color={dryRun ? Color.Yellow : Color.Green} />
+            </Detail.Metadata.TagList>
+          )}
           <Detail.Metadata.TagList title="Status">
             <Detail.Metadata.TagList.Item text={status.text} icon={status.icon} color={status.color} />
           </Detail.Metadata.TagList>
@@ -74,14 +75,14 @@ export function RunView({ repo, dryRun }: RunViewProps) {
       }
       actions={
         <ActionPanel>
-          <ActionPanel.Section title={repo.name}>
+          <ActionPanel.Section title={label}>
             {!running && <Action title="Run Again" icon={Icon.ArrowClockwise} onAction={rerun} />}
             {!running && dryRun && (
               <Action.Push
                 title="Run for Real"
                 icon={Icon.Rocket}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "enter" }}
-                target={<RunView repo={repo} dryRun={false} />}
+                target={<RunView command={command} repo={repo} dryRun={false} />}
               />
             )}
           </ActionPanel.Section>
@@ -91,7 +92,7 @@ export function RunView({ repo, dryRun }: RunViewProps) {
               content={state.output}
               shortcut={{ modifiers: ["cmd"], key: "c" }}
             />
-            <Action.ShowInFinder path={repo.path} />
+            {!!repo && <Action.ShowInFinder path={repo.path} />}
           </ActionPanel.Section>
         </ActionPanel>
       }

@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "chip",
   "title": "Chip",
-  "description": "Run che tools from Raycast. Starts with sync-all-branches.",
+  "description": "Run che git tools from Raycast: sync, update, clean, and prune branches and worktrees, plus GitHub Actions status.",
   "icon": "icon.png",
   "author": "cj_rivas",
   "license": "MIT",
@@ -18,7 +18,56 @@
       "title": "Sync All Branches",
       "subtitle": "Chip",
       "description": "Pick a repo and run sync-all-branches in it: push worktrees, collapse the pushed ones, then tidy branches.",
-      "mode": "view"
+      "mode": "view",
+      "icon": "sync-all-branches.png"
+    },
+    {
+      "name": "update-from-origin",
+      "title": "Update from Origin",
+      "subtitle": "Chip",
+      "description": "Pick a repo and run sync-all-branches without pushing: fetch, collapse, rebase.",
+      "mode": "view",
+      "icon": "update-from-origin.png"
+    },
+    {
+      "name": "update-local-branches",
+      "title": "Update Local Branches",
+      "subtitle": "Chip",
+      "description": "Pick a repo and rebase every local branch that has an upstream onto origin.",
+      "mode": "view",
+      "icon": "update-local-branches.png"
+    },
+    {
+      "name": "checkout-my-branches",
+      "title": "Checkout My Branches",
+      "subtitle": "Chip",
+      "description": "Pick a repo and check out recent remote branches you authored that are not local yet.",
+      "mode": "view",
+      "icon": "checkout-my-branches.png"
+    },
+    {
+      "name": "clean-stale-branches",
+      "title": "Clean Stale Branches",
+      "subtitle": "Chip",
+      "description": "Pick a repo and delete local branches whose upstream is gone.",
+      "mode": "view",
+      "icon": "clean-stale-branches.png"
+    },
+    {
+      "name": "prune-worktrees",
+      "title": "Prune Worktrees",
+      "subtitle": "Chip",
+      "description": "Pick a repo and remove every linked worktree, then prune stale admin records.",
+      "mode": "view",
+      "icon": "prune-worktrees.png"
+    },
+    {
+      "name": "all-actions",
+      "title": "All Actions",
+      "subtitle": "Chip",
+      "description": "Show the latest GitHub Actions run for every open PR you authored, across every repo you own.",
+      "mode": "view",
+      "icon": "all-actions.png"
     }
   ],
   "preferences": [
@@ -30,16 +79,9 @@
       "required": false
     },
     {
-      "name": "cheHome",
-      "title": "che Home",
-      "description": "Path to the che checkout. Defaults to CHE_HOME from the che install block in ~/.zshrc.",
-      "type": "directory",
-      "required": false
-    },
-    {
       "name": "chePython",
       "title": "Python Interpreter",
-      "description": "Python 3.12+ used to run che scripts. Defaults to CHE_PYTHON from ~/.zshrc.",
+      "description": "Python 3.12+ used to run che scripts. Defaults to the Homebrew python3.",
       "type": "file",
       "required": false
     }
@@ -48,6 +90,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@codebend3r/che": "1.1.0",
     "@raycast/api": "2.2.0",
     "@raycast/utils": "2.3.1"
   },
@@ -59,10 +102,12 @@
     "typescript": "5.9.3"
   },
   "scripts": {
+    "postinstall": "bun run sync-che",
+    "sync-che": "rm -rf assets/che && mkdir -p assets/che && cp -R node_modules/@codebend3r/che/bin assets/che/bin",
     "dev": "ray develop",
     "build": "ray build -e dist",
-    "lint": "oxlint && oxfmt --check",
-    "fix-lint": "oxlint --fix && oxfmt",
+    "lint": "oxlint --fix ",
+    "lint:check": "oxfmt --check",
     "publish": "bunx @raycast/api@latest publish"
   }
 }

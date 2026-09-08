@@ -13,6 +13,10 @@ export type Repo = {
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "target", "vendor"]);
 
+export function expandHome(path: string): string {
+  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path;
+}
+
 export function defaultReposRoot(): string {
   return join(homedir(), "Developer", "git");
 }

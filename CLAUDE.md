@@ -1,7 +1,8 @@
 # chip
 
 Personal Raycast extension that runs [che](https://github.com/codebend3r/che)
-tools from Raycast. One command so far: **Sync All Branches**.
+tools from Raycast, one command per che git tool. The che scripts come from the
+`@codebend3r/che` npm package; nothing outside this repo is read at runtime.
 
 ## Git policy — read this first
 
@@ -32,16 +33,25 @@ pin into a range.
 
 ## Layout
 
-| File                        | Role                                                          |
-| --------------------------- | ------------------------------------------------------------- |
-| `src/sync-all-branches.tsx` | Command entry. `List` of repos, actions push `RunView`.       |
-| `src/run-view.tsx`          | `Detail` view. Streams output, toasts on finish.              |
-| `src/lib/repos.ts`          | `findRepos()` — scans the root 2 levels deep for main clones. |
-| `src/lib/che.ts`            | `resolveChe()` — locates che's home, python, and script.      |
-| `src/lib/runner.ts`         | `useSyncRunner()` — spawns the script, streams stdout/stderr. |
+| File                  | Role                                                                |
+| --------------------- | ------------------------------------------------------------------- |
+| `src/<command>.tsx`   | One entry per command. Renders `RepoList`, or `RunView` for global. |
+| `src/repo-list.tsx`   | Repo picker shared by repo-scoped commands. Actions push `RunView`. |
+| `src/run-view.tsx`    | `Detail` view. Streams output, toasts on finish.                    |
+| `src/lib/commands.ts` | `CHE_COMMANDS` — script, fixed args, dry-run support, scope, icon.  |
+| `src/lib/repos.ts`    | `findRepos()` — scans the root 2 levels deep for main clones.       |
+| `src/lib/che.ts`      | `resolveChe()` — picks the python and a bundled script by name.     |
+| `src/lib/runner.ts`   | `useCheRunner()` — spawns a che script, streams stdout/stderr.      |
+| `icons/*.svg`         | Icon sources. Fill-only shapes; the rasterizer drops strokes.       |
 
-`raycast-env.d.ts` and `dist/` are generated and gitignored — edit `package.json`,
-not the generated file.
+Adding a command means one `CHE_COMMANDS` entry, one `src/<name>.tsx`, one `commands`
+entry in `package.json`, and one `assets/<name>.png`. Regenerate icons with
+`magick -background none icons/<name>.svg -resize 512x512 assets/<name>.png`.
+
+`raycast-env.d.ts`, `dist/`, and `assets/che/` are generated and gitignored — edit
+`package.json`, not the generated file. `postinstall` copies `@codebend3r/che`'s `bin/`
+into `assets/che/bin` because Raycast ships `assets/` with the build but not
+`node_modules`. Re-run `bun install` after bumping the che pin.
 
 ## React
 
@@ -102,11 +112,14 @@ not the generated file.
 - **This extension deletes things.** `sync-all-branches.py` deletes local branches
   and removes worktrees. Treat `runner.ts` and `che.ts` as destructive-path changes.
 - `dryRun` is passed twice — `--dry-run` on the argv and the `DRY_RUN` env var. Keep
-  both in sync.
+  both in sync. `prune-worktrees.py` defaults `DRY_RUN` to true, so the explicit
+  `false` on live runs is load-bearing.
+- `all-actions` is global: it runs from the home directory and needs `gh` on
+  `EXTRA_PATH`. Every other command runs inside the picked repo.
 - Raycast launches node with a bare `PATH`, so `runner.ts` prepends `EXTRA_PATH` to
   reach `git` and `python3`. Removing it breaks the extension at runtime only.
-- `che.ts` reads `CHE_HOME` and `CHE_PYTHON` out of `~/.zshrc` when the matching
-  preference is empty.
+- `che.ts` resolves the script through `environment.assetsPath`. Running the script
+  straight out of `node_modules` does not work; Raycast never copies it.
 - `findRepos()` skips linked worktrees on purpose.
 - The `oxlint-disable-next-line` comments in `run-view.tsx` and `runner.ts` are
   intentional effect patterns. Do not "fix" them into the dependency arrays.
