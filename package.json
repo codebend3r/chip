@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "chip",
+  "name": "@codebend3r/chip",
   "title": "Chip",
   "description": "Run che git tools from Raycast: sync, update, clean, and prune branches and worktrees, plus GitHub Actions status.",
   "icon": "icon.png",
@@ -108,6 +108,7 @@
     "build": "ray build -e dist",
     "lint": "oxlint --fix ",
     "lint:check": "oxfmt --check",
-    "publish": "bunx @raycast/api@latest publish"
+    "publish:raycast": "bunx @raycast/api@latest publish",
+    "release": "npm version patch -m \"CHIP: Release v%s\" && git push --follow-tags && npm publish --access public"
   }
 }

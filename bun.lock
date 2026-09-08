@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "chip",
+      "name": "@codebend3r/chip",
       "dependencies": {
         "@codebend3r/che": "1.1.0",
         "@raycast/api": "2.2.0",
