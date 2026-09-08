@@ -110,5 +110,6 @@
     "lint:check": "oxfmt --check",
     "publish:raycast": "bunx @raycast/api@latest publish",
     "release": "npm version patch -m \"CHIP: Release v%s\" && git push --follow-tags && npm publish --access public"
-  }
+  },
+  "version": "0.0.1"
 }
