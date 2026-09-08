@@ -2,11 +2,13 @@ import { ChildProcess, spawn } from "node:child_process";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveChe } from "./che";
 import { CheCommand } from "./commands";
+import { spawnPath } from "./path";
 
 export type RunStatus = "running" | "succeeded" | "failed";
 
 export type RunState = {
   status: RunStatus;
+  /** Raw stdout and stderr, ANSI included; `parseRunLog` reads the colors. */
   output: string;
   exitCode: number | null;
   startedAt: number;
@@ -19,17 +21,6 @@ export type RunOptions = {
   cwd: string;
   dryRun: boolean;
 };
-
-/** Raycast launches node with a bare PATH; git, gh, and python live here on macOS. */
-const EXTRA_PATH = [
-  "/opt/homebrew/bin",
-  "/opt/homebrew/sbin",
-  "/usr/local/bin",
-  "/usr/bin",
-  "/bin",
-  "/usr/sbin",
-  "/sbin",
-];
 
 function freshState(): RunState {
   return { status: "running", output: "", exitCode: null, startedAt: Date.now(), finishedAt: null };
@@ -51,9 +42,10 @@ export function useCheRunner({ command, cwd, dryRun }: RunOptions) {
     const args = [che.script, ...command.args, ...(dryRun ? ["--dry-run"] : [])];
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      PATH: [...EXTRA_PATH, process.env.PATH ?? ""].filter(Boolean).join(":"),
+      PATH: spawnPath(),
       DRY_RUN: dryRun ? "true" : "false",
-      NO_COLOR: "1",
+      // che colors each line by meaning; the view reads those codes to build the timeline.
+      FORCE_COLOR: "1",
       PYTHONUNBUFFERED: "1",
       GIT_TERMINAL_PROMPT: "0",
     };

@@ -1,7 +1,6 @@
-import { CHE_COMMANDS } from "./lib/commands";
-import { RunView } from "./run-view";
+import { ActionsView } from "./actions-view";
 
-/** Not repo-scoped: che scans every repo the gh login owns, so it runs straight away. */
+/** Not repo-scoped: che scans every repo the gh login owns, so it renders the list straight away. */
 export default function Command() {
-  return <RunView command={CHE_COMMANDS["all-actions"]} dryRun={false} />;
+  return <ActionsView />;
 }

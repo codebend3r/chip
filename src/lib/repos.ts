@@ -9,6 +9,8 @@ export type Repo = {
   relativePath: string;
   /** Checked-out branch, or a short sha when detached. */
   branch: string | undefined;
+  /** Browser URL of the origin remote, when it has one. */
+  remoteUrl: string | undefined;
 };
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "target", "vendor"]);
@@ -42,6 +44,22 @@ function currentBranch(dir: string): string | undefined {
   }
 }
 
+/** `git@github.com:o/r.git` and `https://github.com/o/r.git` both become `https://github.com/o/r`. */
+function remoteUrl(dir: string): string | undefined {
+  try {
+    const config = readFileSync(join(dir, ".git", "config"), "utf8");
+    const origin = config.match(/\[remote "origin"\][^[]*?\burl\s*=\s*(\S+)/);
+    const url = origin?.[1];
+    if (!url) return undefined;
+    const ssh = url.match(/^(?:ssh:\/\/)?(?:git@)?([^:/]+)[:/](.+)$/);
+    const https = url.match(/^https?:\/\/(.+)$/);
+    const bare = https ? https[1] : ssh ? `${ssh[1]}/${ssh[2]}` : undefined;
+    return bare ? `https://${bare.replace(/\.git$/, "")}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 type FindReposOptions = {
   root: string;
   depth?: number;
@@ -65,7 +83,15 @@ export function findRepos({ root, depth = 2 }: FindReposOptions): Repo[] {
         const full = join(dir, entry.name);
         const kind = gitKind(full);
         if (kind === "repo") {
-          return [{ name: entry.name, path: full, relativePath: relative(root, full), branch: currentBranch(full) }];
+          return [
+            {
+              name: entry.name,
+              path: full,
+              relativePath: relative(root, full),
+              branch: currentBranch(full),
+              remoteUrl: remoteUrl(full),
+            },
+          ];
         }
         return kind === "none" && level < depth ? walk(full, level + 1) : [];
       });

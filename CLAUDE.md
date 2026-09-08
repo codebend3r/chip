@@ -33,16 +33,22 @@ pin into a range.
 
 ## Layout
 
-| File                  | Role                                                                |
-| --------------------- | ------------------------------------------------------------------- |
-| `src/<command>.tsx`   | One entry per command. Renders `RepoList`, or `RunView` for global. |
-| `src/repo-list.tsx`   | Repo picker shared by repo-scoped commands. Actions push `RunView`. |
-| `src/run-view.tsx`    | `Detail` view. Streams output, toasts on finish.                    |
-| `src/lib/commands.ts` | `CHE_COMMANDS` — script, fixed args, dry-run support, scope, icon.  |
-| `src/lib/repos.ts`    | `findRepos()` — scans the root 2 levels deep for main clones.       |
-| `src/lib/che.ts`      | `resolveChe()` — picks the python and a bundled script by name.     |
-| `src/lib/runner.ts`   | `useCheRunner()` — spawns a che script, streams stdout/stderr.      |
-| `icons/*.svg`         | Icon sources. Fill-only shapes; the rasterizer drops strokes.       |
+| File                    | Role                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `src/<command>.tsx`     | One entry per command. Renders `RepoList`, or `ActionsView` for `all-actions`.  |
+| `src/repo-list.tsx`     | Repo picker with a briefing panel: the plan, then live git state via `inspect`. |
+| `src/run-view.tsx`      | `Detail` view. Parses che output into a timeline, metadata rail, toasts.        |
+| `src/actions-view.tsx`  | `List` of open PRs parsed from `all-actions` output, one row per PR.            |
+| `src/lib/commands.ts`   | `CHE_COMMANDS` — script, args, dry-run support, scope, icon, briefing copy.     |
+| `src/lib/repos.ts`      | `findRepos()` — scans the root 2 levels deep for main clones.                   |
+| `src/lib/inspect.ts`    | `inspectRepo()` — read-only git queries behind the briefing panel.              |
+| `src/lib/che.ts`        | `resolveChe()` — picks the python and a bundled script by name.                 |
+| `src/lib/runner.ts`     | `useCheRunner()` — spawns a che script, streams stdout/stderr.                  |
+| `src/lib/path.ts`       | `EXTRA_PATH` — the PATH every child process gets.                               |
+| `src/lib/log.ts`        | `parseRunLog()` — che's ANSI colors become line kinds, banners become sections. |
+| `src/lib/render-log.ts` | `renderRunLog()` — sections to Raycast markdown; summaries become tables.       |
+| `src/lib/actions.ts`    | `parseActionRuns()` — the `all-actions` table to rows, with OSC 8 run links.    |
+| `icons/*.svg`           | Icon sources. Fill-only shapes; the rasterizer drops strokes.                   |
 
 Adding a command means one `CHE_COMMANDS` entry, one `src/<name>.tsx`, one `commands`
 entry in `package.json`, and one `assets/<name>.png`. Regenerate icons with
@@ -116,8 +122,15 @@ into `assets/che/bin` because Raycast ships `assets/` with the build but not
   `false` on live runs is load-bearing.
 - `all-actions` is global: it runs from the home directory and needs `gh` on
   `EXTRA_PATH`. Every other command runs inside the picked repo.
-- Raycast launches node with a bare `PATH`, so `runner.ts` prepends `EXTRA_PATH` to
-  reach `git` and `python3`. Removing it breaks the extension at runtime only.
+- Raycast launches node with a bare `PATH`, so `runner.ts` and `inspect.ts` prepend
+  `EXTRA_PATH` from `path.ts` to reach `git` and `python3`. Removing it breaks the
+  extension at runtime only.
+- `runner.ts` sets `FORCE_COLOR=1` on purpose. che colors each line by meaning (green
+  progress, red warning, cyan info, yellow banner, magenta summary) and `log.ts` reads
+  those codes to build sections and stats. Switching to `NO_COLOR` turns the run view
+  into a flat code block and empties the summary rail.
+- `actions-view.tsx` reads the OSC 8 hyperlink che wraps around each repo cell to get
+  the workflow-run URL. That link is only emitted when color is on.
 - `che.ts` resolves the script through `environment.assetsPath`. Running the script
   straight out of `node_modules` does not work; Raycast never copies it.
 - `findRepos()` skips linked worktrees on purpose.
