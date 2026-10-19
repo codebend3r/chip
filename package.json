@@ -90,7 +90,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@codebend3r/che": "1.1.0",
+    "@codebend3r/che": "1.2.1",
     "@raycast/api": "2.2.0",
     "@raycast/utils": "2.3.1"
   },
