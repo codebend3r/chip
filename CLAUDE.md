@@ -48,11 +48,24 @@ pin into a range.
 | `src/lib/log.ts`        | `parseRunLog()` — che's ANSI colors become line kinds, banners become sections. |
 | `src/lib/render-log.ts` | `renderRunLog()` — sections to Raycast markdown; summaries become tables.       |
 | `src/lib/actions.ts`    | `parseActionRuns()` — the `all-actions` table to rows, with OSC 8 run links.    |
+| `src/lib/ember.ts`      | `EMBER` palette for tags and tints, `emberHead()` for the amber title block.    |
 | `icons/*.svg`           | Icon sources. Fill-only shapes; the rasterizer drops strokes.                   |
 
 Adding a command means one `CHE_COMMANDS` entry, one `src/<name>.tsx`, one `commands`
-entry in `package.json`, and one `assets/<name>.png`. Regenerate icons with
+entry in `package.json`, one `assets/<name>.png`, and one `assets/ember/<name>.png`. Regenerate icons with
 `magick -background none icons/<name>.svg -resize 512x512 assets/<name>.png`.
+
+Each command also needs `assets/ember/<name>.png`, the amber tile `emberHead()` puts
+above a title. It is the same SVG with the fills swapped:
+
+```sh
+sed -e 's/#111827/#TMPBG/g' -e 's/#F59E0B/#1C1206/g' -e 's/#FDE68A/#6B4308/g' -e 's/#TMPBG/#F59E0B/g' \
+  icons/<name>.svg | magick -background none svg:- -resize 192x192 assets/ember/<name>.png
+```
+
+Ember tones only reach tags, `TagList` items and icon tints. `Metadata.Label` text
+takes the `Color` enum alone, and the window background belongs to the user's
+Raycast theme.
 
 `raycast-env.d.ts`, `dist/`, and `assets/che/` are generated and gitignored — edit
 `package.json`, not the generated file. `postinstall` copies `@codebend3r/che`'s `bin/`
@@ -136,5 +149,13 @@ into `assets/che/bin` because Raycast ships `assets/` with the build but not
 - `findRepos()` skips linked worktrees on purpose.
 - The `oxlint-disable-next-line` comments in `run-view.tsx` and `runner.ts` are
   intentional effect patterns. Do not "fix" them into the dependency arrays.
+- `name` in `package.json` must stay `chip`. Raycast only accepts an unscoped name
+  (`ray lint` rejects `@codebend3r/chip`) and silently never loads a scoped build, so
+  the old one keeps showing. npm needs the scope, so `publish:npm` sets
+  `@codebend3r/chip` for the publish and puts `chip` back afterwards.
+- `log.ts` reads two che formats: the colored line kinds from `utils.py`, and
+  `report.py`'s event lines and closing summary table (a `─` rule, a bold title, one
+  row per outcome). After bumping che, dry-run a script with `FORCE_COLOR=1` and check
+  the run view still shows a summary table.
 - Commands and preferences are declared in `package.json`, not in code.
 - No ESLint config, so the Raycast Store is off the table. Deliberate.

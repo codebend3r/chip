@@ -40,7 +40,7 @@ function renderBlock(block: Block): string {
 
 /** A summary block becomes a table when it holds counts; the rest of its lines follow as text. */
 function renderSummary(section: LogSection): string {
-  const isStat = (line: LogLine) => line.depth === 0 && /:\s+\d+$/.test(line.text);
+  const isStat = (line: LogLine) => line.depth === 0 && /^[A-Za-z].*:\s+\d+$/.test(line.text);
   const rows = section.lines.reduce<{ label: string; count: string; items: string[] }[]>((acc, line) => {
     const stat = isStat(line) ? line.text.match(/^(.*?):\s+(\d+)$/) : null;
     if (stat) return [...acc, { label: stat[1], count: stat[2], items: [] }];

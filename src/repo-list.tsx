@@ -2,15 +2,18 @@ import { homedir } from "node:os";
 import { Action, ActionPanel, Color, Icon, List, getPreferenceValues } from "@raycast/api";
 import { useCachedPromise, useFrecencySorting } from "@raycast/utils";
 import { useMemo, useState } from "react";
-import { CheCommand } from "./lib/commands";
+import { CheCommand, groupTitle } from "./lib/commands";
+import { EMBER, emberHead } from "./lib/ember";
 import { RepoInspection, inspectRepo } from "./lib/inspect";
-import { planMarkdown } from "./lib/plan";
+import { notesMarkdown, stepsMarkdown } from "./lib/plan";
 import { mdEscape } from "./lib/render-log";
 import { Repo, defaultReposRoot, expandHome, findRepos } from "./lib/repos";
 import { RunView } from "./run-view";
 
 type RepoListProps = {
   command: CheCommand;
+  /** Makes the preview the Enter action and the live run the secondary one. Ignored when the command has no dry run. */
+  previewFirst?: boolean;
 };
 
 function tilde(path: string): string {
@@ -20,7 +23,13 @@ function tilde(path: string): string {
 
 /** What the command will do to this repo, in the script's own order. */
 function briefing({ command, repo }: { command: CheCommand; repo: Repo }): string {
-  return [`# ${mdEscape(repo.name)}`, planMarkdown({ command })].join("\n\n");
+  const head = emberHead({
+    command,
+    eyebrow: `${groupTitle({ group: command.group })} / ${command.name}`,
+    title: mdEscape(repo.name),
+    lead: command.summary,
+  });
+  return [head, stepsMarkdown({ command }), notesMarkdown({ command })].filter((part) => !!part).join("\n\n");
 }
 
 type SyncText = { value: string; color: Color };
@@ -109,12 +118,13 @@ function RepoBriefing({ command, repo }: RepoBriefingProps) {
 }
 
 /** Repo picker shared by every repo-scoped command. Picking a repo pushes RunView. */
-export function RepoList({ command }: RepoListProps) {
+export function RepoList({ command, previewFirst = false }: RepoListProps) {
   const prefs = getPreferenceValues<Preferences>();
   const root = prefs.reposRoot?.trim() ? expandHome(prefs.reposRoot.trim()) : defaultReposRoot();
   const repos = useMemo(() => findRepos({ root }), [root]);
   const { data: sorted, visitItem } = useFrecencySorting(repos, { key: (repo) => repo.path });
   const [selected, setSelected] = useState<string | null>(null);
+  const preview = command.dryRun && previewFirst;
 
   return (
     <List
@@ -133,13 +143,13 @@ export function RepoList({ command }: RepoListProps) {
           <List.Item
             key={repo.path}
             id={repo.path}
-            icon={Icon.Folder}
+            icon={{ source: Icon.Folder, tintColor: selected === repo.path ? EMBER.accent : EMBER.muted }}
             title={repo.name}
             keywords={[repo.relativePath, ...(repo.branch ? [repo.branch] : [])]}
             accessories={
               repo.branch
-                ? [{ tag: { value: repo.branch, color: repo.branch === "main" ? Color.Green : Color.Blue } }]
-                : [{ tag: { value: "detached", color: Color.Orange } }]
+                ? [{ tag: { value: repo.branch, color: repo.branch === "main" ? EMBER.good : EMBER.info } }]
+                : [{ tag: { value: "detached", color: EMBER.warn } }]
             }
             detail={
               selected === repo.path ? (
@@ -151,19 +161,30 @@ export function RepoList({ command }: RepoListProps) {
             actions={
               <ActionPanel>
                 <ActionPanel.Section title={repo.name}>
-                  <Action.Push
-                    title={command.title}
-                    icon={{ source: command.icon }}
-                    onPush={() => visitItem(repo)}
-                    target={<RunView command={command} repo={repo} dryRun={false} />}
-                  />
+                  {!preview && (
+                    <Action.Push
+                      title={command.title}
+                      icon={{ source: command.icon }}
+                      onPush={() => visitItem(repo)}
+                      target={<RunView command={command} repo={repo} dryRun={false} />}
+                    />
+                  )}
                   {command.dryRun && (
                     <Action.Push
                       title="Preview Changes"
                       icon={Icon.Eye}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "enter" }}
+                      shortcut={preview ? undefined : { modifiers: ["cmd", "shift"], key: "enter" }}
                       onPush={() => visitItem(repo)}
                       target={<RunView command={command} repo={repo} dryRun />}
+                    />
+                  )}
+                  {preview && (
+                    <Action.Push
+                      title="Run for Real"
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "enter" }}
+                      onPush={() => visitItem(repo)}
+                      target={<RunView command={command} repo={repo} dryRun={false} />}
                     />
                   )}
                 </ActionPanel.Section>

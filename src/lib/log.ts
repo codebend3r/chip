@@ -18,7 +18,7 @@ export type LogLine = {
 export type LogSection = {
   /** Text of the banner that opened the section; "" before the first banner. */
   title: string;
-  /** True for che's `═══ summary ═══` blocks. */
+  /** True for che's closing table: a `─` rule, a bold title, then one row per outcome. */
   summary: boolean;
   lines: readonly LogLine[];
 };
@@ -41,11 +41,18 @@ const SGR = /\x1b\[[0-9;]*m/g;
 const OSC8 = /\x1b\]8;;([^\x1b]*)\x1b\\([\s\S]*?)\x1b\]8;;\x1b\\/g;
 const OSC8_ONE = new RegExp(OSC8.source);
 const LEADING_SGR = /^\x1b\[([0-9;]*)m/;
+/** report.py's summary heading: a bold title, then dim facts like `2 branches · 0.3s`. */
+const HEADING = /^\x1b\[1m(.+?)\x1b\[0m(?: {2}\x1b\[90m(.*?)\x1b\[0m)?\s*$/;
+/** A summary row: `  = Up to date  1   main`. Colored symbol, label, bold count, optional first item. */
+const ROW = /^ {2}\x1b\[(\d+)m(\S+)\x1b\[0m (.+?) {2}\x1b\[1m\s*(\d+)\x1b\[0m(?: {3}(.*))?$/;
+/** A live event: `  ✓ updated       feature-x  3 new commits`. The color wraps the symbol and the padded verb. */
+const EVENT = /^ {2}\x1b\[(\d+)m(\S+) (.*?)\s*\x1b\[0m {2}(.*)$/;
+/** A dim line under the summary table. */
+const DIM = /^ {2}\x1b\[90m(.*)\x1b\[0m\s*$/;
 // oxlint-enable no-control-regex
 const RULE = /^[═─]{3,}$/;
-const SUMMARY_TITLE = /^═{3}\s+(.+?)\s+═{3}$/;
-/** "⬆️  Pushed:    2", "👻  Skipped (not yours): 5", "❌ Failed:  1". */
-const STAT = /^(?:[^\w\s]\S*\s+)?([A-Za-z][\w ()'/-]*?):\s+(\d+)$/;
+/** A summary row once `parseLines` has normalised it: "Up to date: 1". */
+const STAT = /^([A-Za-z][\w ()'/-]*?):\s+(\d+)$/;
 
 const KIND_BY_CODE: Record<string, LogKind> = {
   "0;32": "progress",
@@ -54,6 +61,21 @@ const KIND_BY_CODE: Record<string, LogKind> = {
   "1;33": "note",
   "1;35": "success",
 };
+
+/** report.py's tones: green done, cyan planned or noted, yellow needs attention, red failed, grey unchanged. */
+const KIND_BY_TONE: Record<string, LogKind> = {
+  "32": "progress",
+  "36": "info",
+  "33": "note",
+  "31": "warning",
+  "90": "plain",
+};
+
+function tidy(text: string): string {
+  return stripAnsi(text)
+    .trim()
+    .replace(/\s{2,}/g, " ");
+}
 
 export function stripAnsi(text: string): string {
   return text.replace(OSC8, "$2").replace(SGR, "");
@@ -70,6 +92,35 @@ export function parseLine(raw: string): LogLine {
     .replace(/^•\s+/, "")
     .replace(/\s{2,}/g, " ");
   return { kind, text: body, depth: Math.min(3, Math.floor(leading / 2)), ...(link ? { link } : {}) };
+}
+
+/**
+ * One raw line as the lines the views work with. report.py's shapes are
+ * normalised first: a summary row becomes "Label: count" plus its first item
+ * one level down, so stats and the summary table read every row the same way.
+ */
+export function parseLines(raw: string): LogLine[] {
+  const row = raw.match(ROW);
+  if (row) {
+    const kind = KIND_BY_TONE[row[1]] ?? "plain";
+    const first = tidy(row[5] ?? "");
+    return [
+      { kind, text: `${tidy(row[3])}: ${row[4]}`, depth: 0 },
+      ...(first ? [{ kind, text: first, depth: 1 }] : []),
+    ];
+  }
+  const event = raw.match(EVENT);
+  if (event) {
+    const kind = KIND_BY_TONE[event[1]] ?? "plain";
+    const [item, ...detail] = stripAnsi(event[4])
+      .trim()
+      .split(/\s{2,}/);
+    const tail = detail.length ? ` (${detail.join(", ")})` : "";
+    return [{ kind: kind === "plain" ? "info" : kind, text: `${event[2]} ${tidy(event[3])} ${item}${tail}`, depth: 0 }];
+  }
+  const dim = raw.match(DIM);
+  if (dim) return [{ kind: "info", text: tidy(dim[1]), depth: 0 }];
+  return [parseLine(raw)];
 }
 
 type ParseAccumulator = {
@@ -106,13 +157,17 @@ function collectStats(sections: readonly LogSection[]): LogStat[] {
 export function parseRunLog(output: string): RunLog {
   const parsed = output.split("\n").reduce<ParseAccumulator>(
     (acc, raw) => {
-      const line = parseLine(raw);
+      const heading = acc.afterRule ? raw.match(HEADING) : null;
+      if (heading) {
+        const facts = tidy(heading[2] ?? "");
+        const lines: LogLine[] = facts ? [{ kind: "info", text: facts, depth: 0 }] : [];
+        return open(acc, { title: tidy(heading[1]), summary: true, lines });
+      }
+      const [line, ...rest] = parseLines(raw);
       if (line.text === "") return { ...acc, afterRule: false };
       if (RULE.test(line.text)) return { ...acc, afterRule: true };
-      const summaryTitle = line.text.match(SUMMARY_TITLE);
-      if (summaryTitle) return open(acc, { title: summaryTitle[1], summary: true, lines: [] });
       if (acc.afterRule && line.kind === "note") return open(acc, { title: line.text, summary: false, lines: [] });
-      return append(acc, line);
+      return [line, ...rest].reduce(append, acc);
     },
     { sections: [], afterRule: false },
   );

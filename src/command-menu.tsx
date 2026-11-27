@@ -1,121 +1,146 @@
-import { Action, ActionPanel, Color, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, Icon, List } from "@raycast/api";
+import { useState } from "react";
 import { ActionsView } from "./actions-view";
-import { CHE_COMMANDS, CHE_GROUPS, CheCommand, CheGroup } from "./lib/commands";
-import { planMarkdown } from "./lib/plan";
+import { CHE_COMMANDS, CHE_GROUPS, CheCommand, CheCommandName, CheGroup } from "./lib/commands";
+import { EMBER, Pill, emberHead } from "./lib/ember";
+import { stepsMarkdown } from "./lib/plan";
 import { RepoList } from "./repo-list";
 
-type Tag = { value: string; color: Color };
-
-/** The tags at the end of a row: whether a run can be previewed, and whether a live one deletes. */
-function rowTags({ command }: { command: CheCommand }): List.Item.Accessory[] {
-  return [
-    ...(command.dryRun ? [{ tag: { value: "DRY", color: Color.Green }, tooltip: "Preview with ⌘⇧↩" }] : []),
-    ...(command.removes ? [{ tag: { value: "LIVE", color: Color.Orange }, tooltip: command.removes }] : []),
-  ];
-}
-
-function dryRunTag({ command }: { command: CheCommand }): Tag {
-  return command.dryRun
-    ? { value: "preview with ⌘⇧↩", color: Color.Green }
-    : { value: "no preview", color: Color.SecondaryText };
-}
-
-function effectTag({ command }: { command: CheCommand }): Tag {
-  return command.removes
-    ? { value: "live run deletes", color: Color.Red }
-    : { value: "removes nothing", color: Color.Green };
-}
-
-function scopeTag({ command }: { command: CheCommand }): Tag {
-  return command.scope === "repo"
-    ? { value: "one repo", color: Color.Blue }
-    : { value: "every repo you own", color: Color.Purple };
-}
-
-/** A `che / Group` breadcrumb, the name as a `$` prompt, then the plan. */
-function menuMarkdown({ command, group }: { command: CheCommand; group: CheGroup }): string {
-  return [`\`che / ${group.title}\``, `# $ ${command.name}`, planMarkdown({ command })].join("\n\n");
-}
-
-type CommandDetailProps = {
+type CommandLook = {
   command: CheCommand;
+  /** Whether the dry-run toggle is on for this command. */
+  dry: boolean;
+};
+
+/** The badge at the end of a row: what Enter will do to the repo. */
+function rowBadge({ command, dry }: CommandLook): Pill {
+  if (command.scope === "global") return { text: "GitHub", color: EMBER.info };
+  return command.dryRun && dry ? { text: "Preview", color: EMBER.good } : { text: "Live", color: EMBER.warn };
+}
+
+function dryRunPill({ command, dry }: CommandLook): Pill {
+  if (!command.dryRun) return { text: "Not available", color: EMBER.muted };
+  return dry ? { text: "On, previews only", color: EMBER.good } : { text: "Off, changes the repo", color: EMBER.warn };
+}
+
+function removesPill({ command }: { command: CheCommand }): Pill {
+  return command.removes
+    ? { text: "Deletes on a live run", color: EMBER.warn }
+    : { text: "Nothing", color: EMBER.good };
+}
+
+function scopePill({ command }: { command: CheCommand }): Pill {
+  return command.scope === "repo"
+    ? { text: "One repo you pick", color: EMBER.info }
+    : { text: "Every repo you own", color: EMBER.info };
+}
+
+function invocation({ command }: { command: CheCommand }): string {
+  return ["che", command.name, ...command.args].join(" ");
+}
+
+type PillRowProps = {
+  title: string;
+  pill: Pill;
+};
+
+function PillRow({ title, pill }: PillRowProps) {
+  return (
+    <List.Item.Detail.Metadata.TagList title={title}>
+      <List.Item.Detail.Metadata.TagList.Item text={pill.text} color={pill.color} />
+    </List.Item.Detail.Metadata.TagList>
+  );
+}
+
+type CommandDetailProps = CommandLook & {
   group: CheGroup;
 };
 
-/** Right-hand panel: the plan on top, then a table of what chip knows about the command. */
-function CommandDetail({ command, group }: CommandDetailProps) {
-  const invocation = ["che", command.name, ...command.args].join(" ");
+/** Right-hand panel: the Ember head and the steps, then one key/value row per fact about the command. */
+function CommandDetail({ command, group, dry }: CommandDetailProps) {
+  const head = emberHead({ command, eyebrow: group.title, title: command.name, lead: command.summary });
 
   return (
     <List.Item.Detail
-      markdown={menuMarkdown({ command, group })}
+      markdown={[head, stepsMarkdown({ command })].join("\n\n")}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label title="Command" icon={Icon.Terminal} text={invocation} />
+          <List.Item.Detail.Metadata.Label title="Command" text={invocation({ command })} />
+          <List.Item.Detail.Metadata.Label title="Category" text={group.title} />
           <List.Item.Detail.Metadata.Label title="Script" text={`bin/${command.script}`} />
-          <List.Item.Detail.Metadata.Separator />
-          <List.Item.Detail.Metadata.TagList title="Dry Run">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={dryRunTag({ command }).value}
-              color={dryRunTag({ command }).color}
-            />
-          </List.Item.Detail.Metadata.TagList>
-          <List.Item.Detail.Metadata.TagList title="Effect">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={effectTag({ command }).value}
-              color={effectTag({ command }).color}
-            />
-          </List.Item.Detail.Metadata.TagList>
-          <List.Item.Detail.Metadata.TagList title="Runs In">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={scopeTag({ command }).value}
-              color={scopeTag({ command }).color}
-            />
-          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Label title="Needs" text={command.needs ?? "Nothing extra"} />
+          <PillRow title="Dry Run" pill={dryRunPill({ command, dry })} />
+          <PillRow title="Removes" pill={removesPill({ command })} />
+          <PillRow title="Runs In" pill={scopePill({ command })} />
+          <List.Item.Detail.Metadata.Label title="Flags" text={command.args.length ? command.args.join(" ") : "None"} />
         </List.Item.Detail.Metadata>
       }
     />
   );
 }
 
+type DryState = Partial<Record<CheCommandName, boolean>>;
+
 /** Every che command in one list, grouped like che's own menu. Picking one opens its repo picker or its view. */
 export function CommandMenu() {
   const commands = Object.values(CHE_COMMANDS);
+  const [dryState, setDryState] = useState<DryState>({});
+  const count = `${commands.length} ${commands.length === 1 ? "command" : "commands"}`;
 
   return (
-    <List isShowingDetail navigationTitle="Chip" searchBarPlaceholder="Type to filter">
+    <List isShowingDetail navigationTitle={`Chip, ${count}`} searchBarPlaceholder="Search commands…">
       {CHE_GROUPS.map((group) => (
-        <List.Section key={group.key} title={group.title} subtitle={group.blurb}>
+        <List.Section key={group.key} title={group.title.toUpperCase()} subtitle={group.blurb}>
           {commands
             .filter((command) => command.group === group.key)
-            .map((command) => (
-              <List.Item
-                key={command.name}
-                icon={{ source: command.icon }}
-                title={command.name}
-                keywords={[command.title, group.title]}
-                accessories={rowTags({ command })}
-                detail={<CommandDetail command={command} group={group} />}
-                actions={
-                  <ActionPanel>
-                    <ActionPanel.Section title={command.title}>
-                      <Action.Push
-                        title={command.scope === "repo" ? "Pick a Repo" : command.title}
-                        icon={{ source: command.icon }}
-                        target={command.scope === "repo" ? <RepoList command={command} /> : <ActionsView />}
-                      />
-                    </ActionPanel.Section>
-                    <ActionPanel.Section>
-                      <Action.CopyToClipboard
-                        title="Copy Command"
-                        content={["che", command.name, ...command.args].join(" ")}
-                        shortcut={{ modifiers: ["cmd"], key: "c" }}
-                      />
-                    </ActionPanel.Section>
-                  </ActionPanel>
-                }
-              />
-            ))}
+            .map((command) => {
+              const dry = command.dryRun && !!dryState[command.name];
+              const badge = rowBadge({ command, dry });
+
+              return (
+                <List.Item
+                  key={command.name}
+                  icon={{ source: command.icon }}
+                  title={command.name}
+                  subtitle={command.summary}
+                  keywords={[command.title, group.title]}
+                  accessories={[{ tag: { value: badge.text, color: badge.color } }]}
+                  detail={<CommandDetail command={command} group={group} dry={dry} />}
+                  actions={
+                    <ActionPanel>
+                      <ActionPanel.Section title={command.title}>
+                        <Action.Push
+                          title={dry ? "Preview" : "Run"}
+                          icon={dry ? Icon.Eye : { source: command.icon }}
+                          target={
+                            command.scope === "repo" ? (
+                              <RepoList command={command} previewFirst={dry} />
+                            ) : (
+                              <ActionsView />
+                            )
+                          }
+                        />
+                        {command.dryRun && (
+                          <Action
+                            title={dry ? "Turn Dry Run off" : "Turn Dry Run on"}
+                            icon={dry ? Icon.Bolt : Icon.Eye}
+                            shortcut={{ modifiers: ["cmd"], key: "d" }}
+                            onAction={() => setDryState((state) => ({ ...state, [command.name]: !dry }))}
+                          />
+                        )}
+                      </ActionPanel.Section>
+                      <ActionPanel.Section>
+                        <Action.CopyToClipboard
+                          title="Copy Command"
+                          content={invocation({ command })}
+                          shortcut={{ modifiers: ["cmd"], key: "c" }}
+                        />
+                      </ActionPanel.Section>
+                    </ActionPanel>
+                  }
+                />
+              );
+            })}
         </List.Section>
       ))}
     </List>

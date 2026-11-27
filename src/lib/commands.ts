@@ -23,6 +23,11 @@ export const CHE_GROUPS: readonly CheGroup[] = [
   { key: "github", title: "GitHub", blurb: "Actions runs for your open pull requests" },
 ];
 
+/** The title of the section a command is listed under. */
+export function groupTitle({ group }: { group: CheGroupKey }): string {
+  return CHE_GROUPS.find((entry) => entry.key === group)?.title ?? group;
+}
+
 /** "repo" runs inside a picked repo; "global" runs from the home directory. */
 export type CheScope = "repo" | "global";
 
@@ -53,15 +58,16 @@ export type CheCommand = {
 };
 
 const SYNC_STEPS = [
-  "Fetch and prune every remote",
-  "Push each linked worktree's branch to origin",
-  "Remove worktrees that are clean and fully pushed, keeping their branches",
-  "Prune stale worktree records",
-  "Switch the main clone to the main branch",
-  "Delete local branches whose upstream is gone",
-  "Rebase every local branch onto its upstream",
-  "Check out your remote branches that are not local yet",
+  "Fetch every remote once",
+  "Delete branches already merged into a main or dev branch, along with their worktrees",
+  "Rebase every other branch onto its upstream, inside its worktree when it has one",
+  "Stash uncommitted work before a rebase and restore it afterwards",
+  "Track origin feature branches that are not local yet and not merged",
+  "Report conflicts and carry on with the remaining branches",
 ] as const;
+
+const SYNC_REMOVES =
+  "Branches merged into a main or dev branch, and their worktrees. Uncommitted work in a merged worktree stays stashed. Nothing is pushed.";
 
 /**
  * Mirrors the git block of che's commands.py. Two entries reuse another
@@ -77,11 +83,10 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     args: [],
     dryRun: true,
     scope: "repo",
-    summary: "Push every worktree, collapse the pushed ones, then tidy branches.",
+    summary: "Update every branch and worktree, pruning what has been merged.",
     steps: SYNC_STEPS,
     ordered: true,
-    removes: "Worktrees that are clean and pushed, and local branches whose upstream is gone.",
-    needs: "No uncommitted tracked changes in the main clone.",
+    removes: SYNC_REMOVES,
   },
   "update-from-origin": {
     name: "update-from-origin",
@@ -89,14 +94,13 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     title: "Update from Origin",
     icon: "update-from-origin.png",
     script: "git/sync-all-branches.py",
-    args: ["--no-push"],
+    args: ["--dry-run=false"],
     dryRun: true,
     scope: "repo",
-    summary: "Sync without pushing: collapse worktrees already on origin, then tidy branches.",
-    steps: SYNC_STEPS.filter((step) => !step.startsWith("Push")),
+    summary: "Alias of Sync All Branches: update every branch and worktree, pruning what has been merged.",
+    steps: SYNC_STEPS,
     ordered: true,
-    removes: "Worktrees that are clean and already pushed, and local branches whose upstream is gone.",
-    needs: "No uncommitted tracked changes in the main clone.",
+    removes: SYNC_REMOVES,
   },
   "update-local-branches": {
     name: "update-local-branches",
@@ -109,13 +113,11 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     scope: "repo",
     summary: "Rebase every local branch that has an upstream onto origin.",
     steps: [
-      "Fetch remotes",
-      "Rebase each branch, inside its worktree when it has one",
-      "Abort and report any rebase that hits a conflict",
-      "Return to the branch you started on",
+      "Fetch and prune every remote",
+      "Rebase each branch that has an upstream onto origin",
+      "Abort and report any rebase that hits a conflict, then keep going",
     ],
     ordered: true,
-    needs: "A clean working tree on a checked-out branch.",
   },
   "checkout-my-branches": {
     name: "checkout-my-branches",
@@ -130,10 +132,9 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     steps: [
       "Fetch remotes",
       "Scan the most recent remote branches for your git author email",
-      "Create a tracking branch for each of yours that is missing locally",
+      "Create a tracking branch for each of yours that is missing locally; HEAD stays where it is",
     ],
     ordered: true,
-    needs: "A clean working tree.",
   },
   "clean-stale-branches": {
     name: "clean-stale-branches",
@@ -148,7 +149,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     steps: [
       "Fetch and prune every remote",
       "Find local branches whose upstream no longer exists",
-      "Skip the checked-out branch and any branch pinned in a worktree",
+      "Skip protected branches (main, master, dev, develop, staging) and any branch checked out in a worktree",
       "Delete the rest",
     ],
     ordered: true,
@@ -165,13 +166,14 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     scope: "repo",
     summary: "Remove every linked worktree, then prune stale worktree records.",
     steps: [
-      "Switch the main clone to the main branch",
-      "Remove each linked worktree; git refuses ones with uncommitted changes",
+      "Leave the main worktree untouched",
+      "For each linked worktree, drop its lock and abort any rebase, merge, cherry-pick, revert or bisect in progress",
+      "Stash its uncommitted tracked and untracked work so `git stash list` still has it",
+      "Remove the worktree; one failure never stops the rest",
       "Prune stale worktree records",
     ],
     ordered: true,
-    removes: "Every linked worktree. Branches stay.",
-    needs: "No uncommitted tracked changes in the main clone.",
+    removes: "Every linked worktree, locked, dirty or mid-rebase included. Uncommitted work is stashed first.",
   },
   "all-actions": {
     name: "all-actions",
@@ -182,10 +184,11 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
     args: [],
     dryRun: false,
     scope: "global",
-    summary: "The latest GitHub Actions run for every open pull request you authored.",
+    summary: "The latest GitHub Actions run for every open pull request you authored and every default branch.",
     steps: [
       "Ask GitHub for every open pull request you authored in repos you own",
       "For each, pick the run worth acting on: in flight, else failed, else newest",
+      "Then show the run on the default branch of every repo you own",
     ],
     ordered: false,
   },
