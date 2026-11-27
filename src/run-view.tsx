@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { Action, ActionPanel, Color, Detail, Icon, Keyboard, Toast, showToast } from "@raycast/api";
 import { useEffect, useMemo } from "react";
-import { CheCommand, groupTitle } from "./lib/commands";
+import { CHE_GROUPS, CheCommand } from "./lib/commands";
 import { EMBER, emberHead } from "./lib/ember";
 import { formatClock, formatDuration } from "./lib/duration";
 import { LogKind, RunLog, lastWarning, parseRunLog } from "./lib/log";
@@ -36,6 +36,7 @@ const STAT_COLOR: Record<LogKind, Color> = {
   info: Color.PrimaryText,
   note: Color.PrimaryText,
   warning: Color.Red,
+  dim: Color.PrimaryText,
   plain: Color.PrimaryText,
 };
 
@@ -99,7 +100,7 @@ export function RunView({ command, repo, dryRun }: RunViewProps) {
   const markdown = [
     emberHead({
       command,
-      eyebrow: `${groupTitle({ group: command.group })} / ${dryRun ? "preview" : "live run"}`,
+      eyebrow: `${CHE_GROUPS[command.group].title} / ${dryRun ? "preview" : "live run"}`,
       title: mdEscape(command.title),
       lead: lead({ command, repo, dryRun, state }),
     }),

@@ -1,7 +1,7 @@
 import { Action, ActionPanel, Icon, List } from "@raycast/api";
 import { useState } from "react";
 import { ActionsView } from "./actions-view";
-import { CHE_COMMANDS, CHE_GROUPS, CheCommand, CheCommandName, CheGroup } from "./lib/commands";
+import { CHE_COMMANDS, CHE_GROUPS, CheCommand, CheCommandName } from "./lib/commands";
 import { EMBER, Pill, emberHead } from "./lib/ember";
 import { stepsMarkdown } from "./lib/plan";
 import { RepoList } from "./repo-list";
@@ -52,12 +52,9 @@ function PillRow({ title, pill }: PillRowProps) {
   );
 }
 
-type CommandDetailProps = CommandLook & {
-  group: CheGroup;
-};
-
 /** Right-hand panel: the Ember head and the steps, then one key/value row per fact about the command. */
-function CommandDetail({ command, group, dry }: CommandDetailProps) {
+function CommandDetail({ command, dry }: CommandLook) {
+  const group = CHE_GROUPS[command.group];
   const head = emberHead({ command, eyebrow: group.title, title: command.name, lead: command.summary });
 
   return (
@@ -68,12 +65,57 @@ function CommandDetail({ command, group, dry }: CommandDetailProps) {
           <List.Item.Detail.Metadata.Label title="Command" text={invocation({ command })} />
           <List.Item.Detail.Metadata.Label title="Category" text={group.title} />
           <List.Item.Detail.Metadata.Label title="Script" text={`bin/${command.script}`} />
-          <List.Item.Detail.Metadata.Label title="Needs" text={command.needs ?? "Nothing extra"} />
           <PillRow title="Dry Run" pill={dryRunPill({ command, dry })} />
           <PillRow title="Removes" pill={removesPill({ command })} />
           <PillRow title="Runs In" pill={scopePill({ command })} />
           <List.Item.Detail.Metadata.Label title="Flags" text={command.args.length ? command.args.join(" ") : "None"} />
         </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+type CommandRowProps = CommandLook & {
+  onToggleDry: () => void;
+};
+
+/** One command: its badge, its detail panel, and the actions that open it. */
+function CommandRow({ command, dry, onToggleDry }: CommandRowProps) {
+  const badge = rowBadge({ command, dry });
+
+  return (
+    <List.Item
+      icon={{ source: command.icon }}
+      title={command.name}
+      subtitle={command.summary}
+      keywords={[command.title, CHE_GROUPS[command.group].title]}
+      accessories={[{ tag: { value: badge.text, color: badge.color } }]}
+      detail={<CommandDetail command={command} dry={dry} />}
+      actions={
+        <ActionPanel>
+          <ActionPanel.Section title={command.title}>
+            <Action.Push
+              title={dry ? "Preview" : "Run"}
+              icon={dry ? Icon.Eye : { source: command.icon }}
+              target={command.scope === "repo" ? <RepoList command={command} previewFirst={dry} /> : <ActionsView />}
+            />
+            {command.dryRun && (
+              <Action
+                title={dry ? "Turn Dry Run off" : "Turn Dry Run on"}
+                icon={dry ? Icon.Bolt : Icon.Eye}
+                shortcut={{ modifiers: ["cmd"], key: "d" }}
+                onAction={onToggleDry}
+              />
+            )}
+          </ActionPanel.Section>
+          <ActionPanel.Section>
+            <Action.CopyToClipboard
+              title="Copy Command"
+              content={invocation({ command })}
+              shortcut={{ modifiers: ["cmd"], key: "c" }}
+            />
+          </ActionPanel.Section>
+        </ActionPanel>
       }
     />
   );
@@ -89,55 +131,18 @@ export function CommandMenu() {
 
   return (
     <List isShowingDetail navigationTitle={`Chip, ${count}`} searchBarPlaceholder="Search commands…">
-      {CHE_GROUPS.map((group) => (
+      {Object.values(CHE_GROUPS).map((group) => (
         <List.Section key={group.key} title={group.title.toUpperCase()} subtitle={group.blurb}>
           {commands
             .filter((command) => command.group === group.key)
             .map((command) => {
               const dry = command.dryRun && !!dryState[command.name];
-              const badge = rowBadge({ command, dry });
-
               return (
-                <List.Item
+                <CommandRow
                   key={command.name}
-                  icon={{ source: command.icon }}
-                  title={command.name}
-                  subtitle={command.summary}
-                  keywords={[command.title, group.title]}
-                  accessories={[{ tag: { value: badge.text, color: badge.color } }]}
-                  detail={<CommandDetail command={command} group={group} dry={dry} />}
-                  actions={
-                    <ActionPanel>
-                      <ActionPanel.Section title={command.title}>
-                        <Action.Push
-                          title={dry ? "Preview" : "Run"}
-                          icon={dry ? Icon.Eye : { source: command.icon }}
-                          target={
-                            command.scope === "repo" ? (
-                              <RepoList command={command} previewFirst={dry} />
-                            ) : (
-                              <ActionsView />
-                            )
-                          }
-                        />
-                        {command.dryRun && (
-                          <Action
-                            title={dry ? "Turn Dry Run off" : "Turn Dry Run on"}
-                            icon={dry ? Icon.Bolt : Icon.Eye}
-                            shortcut={{ modifiers: ["cmd"], key: "d" }}
-                            onAction={() => setDryState((state) => ({ ...state, [command.name]: !dry }))}
-                          />
-                        )}
-                      </ActionPanel.Section>
-                      <ActionPanel.Section>
-                        <Action.CopyToClipboard
-                          title="Copy Command"
-                          content={invocation({ command })}
-                          shortcut={{ modifiers: ["cmd"], key: "c" }}
-                        />
-                      </ActionPanel.Section>
-                    </ActionPanel>
-                  }
+                  command={command}
+                  dry={dry}
+                  onToggleDry={() => setDryState((state) => ({ ...state, [command.name]: !dry }))}
                 />
               );
             })}

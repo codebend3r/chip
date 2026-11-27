@@ -38,25 +38,18 @@ function renderBlock(block: Block): string {
   }
 }
 
-/** A summary block becomes a table when it holds counts; the rest of its lines follow as text. */
+/** A summary becomes a table of its rows; the facts, notes and closing line follow as text. */
 function renderSummary(section: LogSection): string {
-  const isStat = (line: LogLine) => line.depth === 0 && /^[A-Za-z].*:\s+\d+$/.test(line.text);
-  const rows = section.lines.reduce<{ label: string; count: string; items: string[] }[]>((acc, line) => {
-    const stat = isStat(line) ? line.text.match(/^(.*?):\s+(\d+)$/) : null;
-    if (stat) return [...acc, { label: stat[1], count: stat[2], items: [] }];
-    const last = acc.at(-1);
-    if (line.depth > 0 && last) return [...acc.slice(0, -1), { ...last, items: [...last.items, line.text] }];
-    return acc;
-  }, []);
-  const rest = section.lines.filter((line) => !isStat(line) && line.depth === 0);
-  const table = rows.length
+  const table = section.rows.length
     ? [
         `| ${mdEscape(section.title)} | | |`,
         "| :-- | --: | :-- |",
-        ...rows.map((row) => `| ${mdEscape(row.label)} | ${row.count} | ${row.items.map(mdEscape).join(", ")} |`),
+        ...section.rows.map(
+          (row) => `| ${mdEscape(row.label)} | ${row.value} | ${row.items.map(mdEscape).join(", ")} |`,
+        ),
       ].join("\n")
     : `### ${mdEscape(section.title)}`;
-  return [table, ...groupBlocks(rest).map(renderBlock)].join("\n\n");
+  return [table, ...groupBlocks(section.lines).map(renderBlock)].join("\n\n");
 }
 
 function renderSection(section: LogSection): string {

@@ -13,7 +13,8 @@ const command = CHE_COMMANDS["all-actions"];
 type StatusLook = { icon: Icon; color: Color.ColorLike; label: string };
 
 /** Mirrors STATUS_ICONS in all-actions.py, with Raycast's own icons and one color per outcome. */
-function statusLook(status: string): StatusLook {
+function statusLook({ status, failed }: ActionRun): StatusLook {
+  if (failed) return { icon: Icon.XMarkCircle, color: EMBER.danger, label: status.replace(/_/g, " ") };
   switch (status) {
     case "in_progress":
       return { icon: Icon.CircleProgress, color: EMBER.info, label: "Running" };
@@ -24,11 +25,6 @@ function statusLook(status: string): StatusLook {
       return { icon: Icon.Clock, color: EMBER.warn, label: "Queued" };
     case "success":
       return { icon: Icon.CheckCircle, color: EMBER.good, label: "Passed" };
-    case "failure":
-    case "timed_out":
-    case "startup_failure":
-    case "action_required":
-      return { icon: Icon.XMarkCircle, color: EMBER.danger, label: status.replace(/_/g, " ") };
     case "cancelled":
       return { icon: Icon.Stop, color: EMBER.muted, label: "Cancelled" };
     case "skipped":
@@ -55,7 +51,7 @@ type RunItemProps = {
 };
 
 function RunItem({ run, rerun, output }: RunItemProps) {
-  const look = statusLook(run.status);
+  const look = statusLook(run);
   const prUrl = pullRequestUrl(run);
   const runUrl = run.url && run.url !== prUrl ? run.url : undefined;
   const pr = run.number === undefined ? undefined : `#${run.number}`;
@@ -105,6 +101,33 @@ function RunItem({ run, rerun, output }: RunItemProps) {
   );
 }
 
+type RunSectionProps = {
+  title: string;
+  /** What the count is a count of, e.g. `3 last run`. */
+  counted: string;
+  /** Appended to the subtitle after the count and the failures. */
+  note?: string;
+  runs: readonly ActionRun[];
+  rerun: () => void;
+  output: string;
+};
+
+/** One titled group of runs; renders nothing when the group is empty. */
+function RunSection({ title, counted, note, runs, rerun, output }: RunSectionProps) {
+  const failing = runs.filter((run) => run.failed).length;
+  const subtitle = [counted, ...(failing ? [`${failing} failing`] : []), ...(note ? [note] : [])].join("  ");
+
+  return (
+    !!runs.length && (
+      <List.Section title={title} subtitle={subtitle}>
+        {runs.map((run) => (
+          <RunItem key={`${run.repo}#${run.number ?? run.branch}`} run={run} rerun={rerun} output={output} />
+        ))}
+      </List.Section>
+    )
+  );
+}
+
 type EmptyProps = {
   status: "running" | "succeeded" | "failed";
   hint: string | undefined;
@@ -131,11 +154,9 @@ export function ActionsView() {
   const running = state.status === "running";
   const runs = useMemo(() => parseActionRuns(state.output), [state.output]);
   const log = useMemo(() => parseRunLog(state.output), [state.output]);
+  const branches = useMemo(() => parseBranchRuns(state.output), [state.output]);
   const live = runs.filter((run) => run.live);
   const settled = runs.filter((run) => !run.live);
-  const failing = settled.filter((run) => statusLook(run.status).color === EMBER.danger).length;
-  const branches = useMemo(() => parseBranchRuns(state.output), [state.output]);
-  const branchesFailing = branches.filter((run) => statusLook(run.status).color === EMBER.danger).length;
 
   useEffect(() => {
     if (state.status === "failed") {
@@ -167,36 +188,28 @@ export function ActionsView() {
       }
     >
       <List.EmptyView icon={empty.icon} title={empty.title} description={empty.description} />
-      {!!live.length && (
-        <List.Section title="In flight" subtitle={`${live.length} running`}>
-          {live.map((run) => (
-            <RunItem key={`${run.repo}#${run.number}`} run={run} rerun={rerun} output={state.output} />
-          ))}
-        </List.Section>
-      )}
-      {!!settled.length && (
-        <List.Section
-          title="Settled"
-          subtitle={[`${settled.length} last run`, ...(failing ? [`${failing} failing`] : []), refreshed].join("  ")}
-        >
-          {settled.map((run) => (
-            <RunItem key={`${run.repo}#${run.number}`} run={run} rerun={rerun} output={state.output} />
-          ))}
-        </List.Section>
-      )}
-      {!!branches.length && (
-        <List.Section
-          title="Default branches"
-          subtitle={[
-            `${branches.length} ${branches.length === 1 ? "repo" : "repos"}`,
-            ...(branchesFailing ? [`${branchesFailing} failing`] : []),
-          ].join("  ")}
-        >
-          {branches.map((run) => (
-            <RunItem key={`${run.repo}@${run.branch}`} run={run} rerun={rerun} output={state.output} />
-          ))}
-        </List.Section>
-      )}
+      <RunSection
+        title="In flight"
+        counted={`${live.length} running`}
+        runs={live}
+        rerun={rerun}
+        output={state.output}
+      />
+      <RunSection
+        title="Settled"
+        counted={`${settled.length} last run`}
+        note={refreshed}
+        runs={settled}
+        rerun={rerun}
+        output={state.output}
+      />
+      <RunSection
+        title="Default branches"
+        counted={`${branches.length} ${branches.length === 1 ? "repo" : "repos"}`}
+        runs={branches}
+        rerun={rerun}
+        output={state.output}
+      />
     </List>
   );
 }

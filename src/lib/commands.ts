@@ -7,7 +7,6 @@ export type CheCommandName =
   | "prune-worktrees"
   | "all-actions";
 
-/** The menu's sections, in the order it lists them. */
 export type CheGroupKey = "branches" | "worktrees" | "github";
 
 export type CheGroup = {
@@ -17,16 +16,12 @@ export type CheGroup = {
   blurb: string;
 };
 
-export const CHE_GROUPS: readonly CheGroup[] = [
-  { key: "branches", title: "Branches", blurb: "Sync, rebase, check out and clean" },
-  { key: "worktrees", title: "Worktrees", blurb: "Linked worktrees and their records" },
-  { key: "github", title: "GitHub", blurb: "Actions runs for your open pull requests" },
-];
-
-/** The title of the section a command is listed under. */
-export function groupTitle({ group }: { group: CheGroupKey }): string {
-  return CHE_GROUPS.find((entry) => entry.key === group)?.title ?? group;
-}
+/** Keyed for lookup by `CheCommand.group`; the menu lists the sections in this order. */
+export const CHE_GROUPS: Record<CheGroupKey, CheGroup> = {
+  branches: { key: "branches", title: "Branches", blurb: "Sync, rebase, check out and clean" },
+  worktrees: { key: "worktrees", title: "Worktrees", blurb: "Linked worktrees and their records" },
+  github: { key: "github", title: "GitHub", blurb: "Actions runs for pull requests and default branches" },
+};
 
 /** "repo" runs inside a picked repo; "global" runs from the home directory. */
 export type CheScope = "repo" | "global";
@@ -53,21 +48,26 @@ export type CheCommand = {
   ordered: boolean;
   /** What a live run can delete. Absent when nothing is removed. */
   removes?: string;
-  /** What the script refuses to run without. */
-  needs?: string;
 };
 
-const SYNC_STEPS = [
-  "Fetch every remote once",
-  "Delete branches already merged into a main or dev branch, along with their worktrees",
-  "Rebase every other branch onto its upstream, inside its worktree when it has one",
-  "Stash uncommitted work before a rebase and restore it afterwards",
-  "Track origin feature branches that are not local yet and not merged",
-  "Report conflicts and carry on with the remaining branches",
-] as const;
-
-const SYNC_REMOVES =
-  "Branches merged into a main or dev branch, and their worktrees. Uncommitted work in a merged worktree stays stashed. Nothing is pushed.";
+/** Everything `sync-all-branches` and its alias share: che runs the same script for both. */
+const SYNC = {
+  group: "branches",
+  script: "git/sync-all-branches.py",
+  dryRun: true,
+  scope: "repo",
+  steps: [
+    "Fetch every remote once",
+    "Delete branches already merged into a main or dev branch, along with their worktrees",
+    "Rebase every other branch onto its upstream, inside its worktree when it has one",
+    "Stash uncommitted work before a rebase and restore it afterwards",
+    "Track origin feature branches that are not local yet and not merged",
+    "Report conflicts and carry on with the remaining branches",
+  ],
+  ordered: true,
+  removes:
+    "Branches merged into a main or dev branch, and their worktrees. Uncommitted work in a merged worktree stays stashed. Nothing is pushed.",
+} satisfies Partial<CheCommand>;
 
 /**
  * Mirrors the git block of che's commands.py. Two entries reuse another
@@ -75,32 +75,20 @@ const SYNC_REMOVES =
  */
 export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   "sync-all-branches": {
+    ...SYNC,
     name: "sync-all-branches",
-    group: "branches",
     title: "Sync All Branches",
     icon: "sync-all-branches.png",
-    script: "git/sync-all-branches.py",
     args: [],
-    dryRun: true,
-    scope: "repo",
     summary: "Update every branch and worktree, pruning what has been merged.",
-    steps: SYNC_STEPS,
-    ordered: true,
-    removes: SYNC_REMOVES,
   },
   "update-from-origin": {
+    ...SYNC,
     name: "update-from-origin",
-    group: "branches",
     title: "Update from Origin",
     icon: "update-from-origin.png",
-    script: "git/sync-all-branches.py",
     args: ["--dry-run=false"],
-    dryRun: true,
-    scope: "repo",
     summary: "Alias of Sync All Branches: update every branch and worktree, pruning what has been merged.",
-    steps: SYNC_STEPS,
-    ordered: true,
-    removes: SYNC_REMOVES,
   },
   "update-local-branches": {
     name: "update-local-branches",
