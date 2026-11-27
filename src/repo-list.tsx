@@ -4,6 +4,7 @@ import { useCachedPromise, useFrecencySorting } from "@raycast/utils";
 import { useMemo, useState } from "react";
 import { CheCommand } from "./lib/commands";
 import { RepoInspection, inspectRepo } from "./lib/inspect";
+import { planMarkdown } from "./lib/plan";
 import { mdEscape } from "./lib/render-log";
 import { Repo, defaultReposRoot, expandHome, findRepos } from "./lib/repos";
 import { RunView } from "./run-view";
@@ -19,13 +20,7 @@ function tilde(path: string): string {
 
 /** What the command will do to this repo, in the script's own order. */
 function briefing({ command, repo }: { command: CheCommand; repo: Repo }): string {
-  const steps = command.steps.map((step, i) => `${command.ordered ? `${i + 1}.` : "-"} ${step}`);
-  const notes = [
-    ...(command.removes ? [`**Removes** ${command.removes}`] : []),
-    ...(command.needs ? [`**Needs** ${command.needs}`] : []),
-    ...(command.dryRun ? ["**Preview** with ⌘⇧↩ to see the plan without changing anything."] : []),
-  ];
-  return [`# ${mdEscape(repo.name)}`, command.summary, steps.join("\n"), notes.join("  \n")].join("\n\n");
+  return [`# ${mdEscape(repo.name)}`, planMarkdown({ command })].join("\n\n");
 }
 
 type SyncText = { value: string; color: Color };

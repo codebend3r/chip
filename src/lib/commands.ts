@@ -7,12 +7,30 @@ export type CheCommandName =
   | "prune-worktrees"
   | "all-actions";
 
+/** The menu's sections, in the order it lists them. */
+export type CheGroupKey = "branches" | "worktrees" | "github";
+
+export type CheGroup = {
+  key: CheGroupKey;
+  title: string;
+  /** Shown beside the section title. */
+  blurb: string;
+};
+
+export const CHE_GROUPS: readonly CheGroup[] = [
+  { key: "branches", title: "Branches", blurb: "Sync, rebase, check out and clean" },
+  { key: "worktrees", title: "Worktrees", blurb: "Linked worktrees and their records" },
+  { key: "github", title: "GitHub", blurb: "Actions runs for your open pull requests" },
+];
+
 /** "repo" runs inside a picked repo; "global" runs from the home directory. */
 export type CheScope = "repo" | "global";
 
 export type CheCommand = {
   name: CheCommandName;
   title: string;
+  /** The menu section this command is listed under. */
+  group: CheGroupKey;
   /** Asset filename, also the command icon in package.json. */
   icon: string;
   /** Script path relative to che's bin/. */
@@ -52,6 +70,7 @@ const SYNC_STEPS = [
 export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   "sync-all-branches": {
     name: "sync-all-branches",
+    group: "branches",
     title: "Sync All Branches",
     icon: "sync-all-branches.png",
     script: "git/sync-all-branches.py",
@@ -66,6 +85,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "update-from-origin": {
     name: "update-from-origin",
+    group: "branches",
     title: "Update from Origin",
     icon: "update-from-origin.png",
     script: "git/sync-all-branches.py",
@@ -80,6 +100,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "update-local-branches": {
     name: "update-local-branches",
+    group: "branches",
     title: "Update Local Branches",
     icon: "update-local-branches.png",
     script: "git/update-local-branches.py",
@@ -98,6 +119,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "checkout-my-branches": {
     name: "checkout-my-branches",
+    group: "branches",
     title: "Checkout My Branches",
     icon: "checkout-my-branches.png",
     script: "git/checkout-my-branches.py",
@@ -115,6 +137,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "clean-stale-branches": {
     name: "clean-stale-branches",
+    group: "branches",
     title: "Clean Stale Branches",
     icon: "clean-stale-branches.png",
     script: "git/clean-stale-branches.py",
@@ -133,6 +156,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "prune-worktrees": {
     name: "prune-worktrees",
+    group: "worktrees",
     title: "Prune Worktrees",
     icon: "prune-worktrees.png",
     script: "git/prune-worktrees.py",
@@ -151,6 +175,7 @@ export const CHE_COMMANDS: Record<CheCommandName, CheCommand> = {
   },
   "all-actions": {
     name: "all-actions",
+    group: "github",
     title: "All Actions",
     icon: "all-actions.png",
     script: "git/all-actions.py",
