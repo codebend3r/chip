@@ -1,7 +1,8 @@
 import { homedir } from "node:os";
 import { Action, ActionPanel, Color, Detail, Icon, Keyboard, Toast, showToast } from "@raycast/api";
 import { useEffect, useMemo } from "react";
-import { CheCommand } from "./lib/commands";
+import { CHE_GROUPS, CheCommand } from "./lib/commands";
+import { EMBER, emberHead } from "./lib/ember";
 import { formatClock, formatDuration } from "./lib/duration";
 import { LogKind, RunLog, lastWarning, parseRunLog } from "./lib/log";
 import { mdEscape, renderRunLog } from "./lib/render-log";
@@ -16,16 +17,16 @@ type RunViewProps = {
   dryRun: boolean;
 };
 
-type StatusTag = { text: string; icon: Icon; color: Color };
+type StatusTag = { text: string; icon: Icon; color: Color.ColorLike };
 
 function statusTag(state: RunState): StatusTag {
   switch (state.status) {
     case "running":
-      return { text: "Running", icon: Icon.CircleProgress, color: Color.Blue };
+      return { text: "Running", icon: Icon.CircleProgress, color: EMBER.info };
     case "succeeded":
-      return { text: "Finished", icon: Icon.CheckCircle, color: Color.Green };
+      return { text: "Finished", icon: Icon.CheckCircle, color: EMBER.good };
     case "failed":
-      return { text: "Failed", icon: Icon.XMarkCircle, color: Color.Red };
+      return { text: "Failed", icon: Icon.XMarkCircle, color: EMBER.danger };
   }
 }
 
@@ -35,6 +36,7 @@ const STAT_COLOR: Record<LogKind, Color> = {
   info: Color.PrimaryText,
   note: Color.PrimaryText,
   warning: Color.Red,
+  dim: Color.PrimaryText,
   plain: Color.PrimaryText,
 };
 
@@ -96,8 +98,12 @@ export function RunView({ command, repo, dryRun }: RunViewProps) {
   }, [state.status]);
 
   const markdown = [
-    `# ${mdEscape(command.title)}`,
-    lead({ command, repo, dryRun, state }),
+    emberHead({
+      command,
+      eyebrow: `${CHE_GROUPS[command.group].title} / ${dryRun ? "preview" : "live run"}`,
+      title: mdEscape(command.title),
+      lead: lead({ command, repo, dryRun, state }),
+    }),
     ...(state.error ? [`> ${mdEscape(state.error)}`] : []),
     body({ command, state, log }),
   ].join("\n\n");
@@ -117,9 +123,9 @@ export function RunView({ command, repo, dryRun }: RunViewProps) {
           {command.dryRun && (
             <Detail.Metadata.TagList title="Mode">
               {dryRun ? (
-                <Detail.Metadata.TagList.Item text="Preview" icon={Icon.Eye} color={Color.Yellow} />
+                <Detail.Metadata.TagList.Item text="Preview" icon={Icon.Eye} color={EMBER.good} />
               ) : (
-                <Detail.Metadata.TagList.Item text="Live" icon={Icon.Bolt} color={Color.Green} />
+                <Detail.Metadata.TagList.Item text="Live" icon={Icon.Bolt} color={EMBER.warn} />
               )}
             </Detail.Metadata.TagList>
           )}

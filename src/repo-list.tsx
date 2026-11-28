@@ -2,14 +2,18 @@ import { homedir } from "node:os";
 import { Action, ActionPanel, Color, Icon, List, getPreferenceValues } from "@raycast/api";
 import { useCachedPromise, useFrecencySorting } from "@raycast/utils";
 import { useMemo, useState } from "react";
-import { CheCommand } from "./lib/commands";
+import { CHE_GROUPS, CheCommand } from "./lib/commands";
+import { EMBER, emberHead } from "./lib/ember";
 import { RepoInspection, inspectRepo } from "./lib/inspect";
+import { notesMarkdown, stepsMarkdown } from "./lib/plan";
 import { mdEscape } from "./lib/render-log";
 import { Repo, defaultReposRoot, expandHome, findRepos } from "./lib/repos";
 import { RunView } from "./run-view";
 
 type RepoListProps = {
   command: CheCommand;
+  /** Makes the preview the Enter action and the live run the secondary one. Ignored when the command has no dry run. */
+  previewFirst?: boolean;
 };
 
 function tilde(path: string): string {
@@ -19,13 +23,13 @@ function tilde(path: string): string {
 
 /** What the command will do to this repo, in the script's own order. */
 function briefing({ command, repo }: { command: CheCommand; repo: Repo }): string {
-  const steps = command.steps.map((step, i) => `${command.ordered ? `${i + 1}.` : "-"} ${step}`);
-  const notes = [
-    ...(command.removes ? [`**Removes** ${command.removes}`] : []),
-    ...(command.needs ? [`**Needs** ${command.needs}`] : []),
-    ...(command.dryRun ? ["**Preview** with ⌘⇧↩ to see the plan without changing anything."] : []),
-  ];
-  return [`# ${mdEscape(repo.name)}`, command.summary, steps.join("\n"), notes.join("  \n")].join("\n\n");
+  const head = emberHead({
+    command,
+    eyebrow: `${CHE_GROUPS[command.group].title} / ${command.name}`,
+    title: mdEscape(repo.name),
+    lead: command.summary,
+  });
+  return [head, stepsMarkdown({ command }), notesMarkdown({ command })].filter((part) => !!part).join("\n\n");
 }
 
 type SyncText = { value: string; color: Color };
@@ -55,9 +59,7 @@ type RepoBriefingProps = {
  */
 function RepoBriefing({ command, repo }: RepoBriefingProps) {
   const { data, isLoading } = useCachedPromise(inspectRepo, [{ path: repo.path }], { keepPreviousData: false });
-  const changes = data
-    ? countText({ count: data.changes, noun: "change", alarm: !!data.changes && !!command.needs })
-    : null;
+  const changes = data ? countText({ count: data.changes, noun: "change", alarm: false }) : null;
 
   return (
     <List.Item.Detail
@@ -113,13 +115,41 @@ function RepoBriefing({ command, repo }: RepoBriefingProps) {
   );
 }
 
+type RunActionProps = {
+  command: CheCommand;
+  repo: Repo;
+  dryRun: boolean;
+  /** The Enter action. The secondary one takes the shortcut and says which kind of run it is. */
+  primary: boolean;
+  onPush: () => void;
+};
+
+function RunAction({ command, repo, dryRun, primary, onPush }: RunActionProps) {
+  const live = primary
+    ? { title: command.title, icon: { source: command.icon } }
+    : { title: "Run for Real", icon: Icon.Bolt };
+  const look = dryRun ? { title: "Preview Changes", icon: Icon.Eye } : live;
+
+  return (
+    <Action.Push
+      title={look.title}
+      icon={look.icon}
+      shortcut={primary ? undefined : { modifiers: ["cmd", "shift"], key: "enter" }}
+      onPush={onPush}
+      target={<RunView command={command} repo={repo} dryRun={dryRun} />}
+    />
+  );
+}
+
 /** Repo picker shared by every repo-scoped command. Picking a repo pushes RunView. */
-export function RepoList({ command }: RepoListProps) {
+export function RepoList({ command, previewFirst = false }: RepoListProps) {
   const prefs = getPreferenceValues<Preferences>();
   const root = prefs.reposRoot?.trim() ? expandHome(prefs.reposRoot.trim()) : defaultReposRoot();
   const repos = useMemo(() => findRepos({ root }), [root]);
   const { data: sorted, visitItem } = useFrecencySorting(repos, { key: (repo) => repo.path });
   const [selected, setSelected] = useState<string | null>(null);
+  // Enter runs the first mode; the other one, when the command can preview, sits on ⌘⇧↩.
+  const modes = command.dryRun ? (previewFirst ? [true, false] : [false, true]) : [false];
 
   return (
     <List
@@ -138,13 +168,13 @@ export function RepoList({ command }: RepoListProps) {
           <List.Item
             key={repo.path}
             id={repo.path}
-            icon={Icon.Folder}
+            icon={{ source: Icon.Folder, tintColor: selected === repo.path ? EMBER.accent : EMBER.muted }}
             title={repo.name}
             keywords={[repo.relativePath, ...(repo.branch ? [repo.branch] : [])]}
             accessories={
               repo.branch
-                ? [{ tag: { value: repo.branch, color: repo.branch === "main" ? Color.Green : Color.Blue } }]
-                : [{ tag: { value: "detached", color: Color.Orange } }]
+                ? [{ tag: { value: repo.branch, color: repo.branch === "main" ? EMBER.good : EMBER.info } }]
+                : [{ tag: { value: "detached", color: EMBER.warn } }]
             }
             detail={
               selected === repo.path ? (
@@ -156,21 +186,16 @@ export function RepoList({ command }: RepoListProps) {
             actions={
               <ActionPanel>
                 <ActionPanel.Section title={repo.name}>
-                  <Action.Push
-                    title={command.title}
-                    icon={{ source: command.icon }}
-                    onPush={() => visitItem(repo)}
-                    target={<RunView command={command} repo={repo} dryRun={false} />}
-                  />
-                  {command.dryRun && (
-                    <Action.Push
-                      title="Preview Changes"
-                      icon={Icon.Eye}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "enter" }}
+                  {modes.map((dryRun, i) => (
+                    <RunAction
+                      key={String(dryRun)}
+                      command={command}
+                      repo={repo}
+                      dryRun={dryRun}
+                      primary={i === 0}
                       onPush={() => visitItem(repo)}
-                      target={<RunView command={command} repo={repo} dryRun />}
                     />
-                  )}
+                  ))}
                 </ActionPanel.Section>
                 <ActionPanel.Section>
                   {!!repo.remoteUrl && (

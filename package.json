@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "@codebend3r/chip",
+  "name": "chip",
   "title": "Chip",
   "description": "Run che git tools from Raycast: sync, update, clean, and prune branches and worktrees, plus GitHub Actions status.",
   "icon": "icon.png",
@@ -13,6 +13,14 @@
     "Developer Tools"
   ],
   "commands": [
+    {
+      "name": "menu",
+      "title": "Chip Menu",
+      "subtitle": "Chip",
+      "description": "Every che git tool in one list, grouped, with what each one runs, previews and deletes.",
+      "mode": "view",
+      "icon": "icon.png"
+    },
     {
       "name": "sync-all-branches",
       "title": "Sync All Branches",
@@ -90,7 +98,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@codebend3r/che": "1.2.1",
+    "@codebend3r/che": "1.3.3",
     "@raycast/api": "2.2.0",
     "@raycast/utils": "2.3.1"
   },
@@ -109,7 +117,8 @@
     "lint": "oxlint --fix ",
     "lint:check": "oxfmt --check",
     "publish:raycast": "bunx @raycast/api@latest publish",
-    "release": "npm version patch -m \"CHIP: Release v%s\" && git push --follow-tags && npm publish --access public"
+    "release": "npm version patch -m \"CHIP: Release v%s\" && git push --follow-tags && bun run publish:npm",
+    "publish:npm": "npm pkg set name=@codebend3r/chip && npm publish --access public; status=$?; npm pkg set name=chip; exit $status"
   },
   "version": "0.0.1"
 }
